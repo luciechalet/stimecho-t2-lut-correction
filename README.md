@@ -10,3 +10,5 @@ Note on assumptions:
 - The "GRAPPATINI" mode assumes that the monoexponential fit applied during reconstruction skipped the first echo of the multi echo train length and was reconstructed from complex data, hence the simulation do not account for a noise floor. Applying the model to other sequence schemes may require further adjustments.
 - The slice profile needs to be provided or simulated as per [StimFit](https://github.com/usc-mrel/StimFit/tree/main).
 
+## Dependencies
+- [StimFit](https://github.com/usc-mrel/StimFit/tree/main)
