@@ -13,3 +13,7 @@ octave-workspace
 # OS
 .DS_Store
 Thumbs.db
+
+# Directories
+proprietary/
+__pycache__/
