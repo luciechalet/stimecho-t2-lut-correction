@@ -164,3 +164,19 @@ Setting verbose to `true` will plot slice profiles obtained for a prescribed sli
 <p align="center">
 <img src="docs/figures/slice_profiles.png" alt="Slice profiles" width="50%"/>
 </p>
+
+## Run EPG for T2 LUT based on slice profiles
+
+The function `build_T2_LUT.m` runs EPG simulation for a given range of T2 values considering slice profiles built in the previous section. 
+
+**Usage**
+```matlab
+[S, TE, T2grid] = build_T2_LUT(opt);
+```
+
+Optionally: passing `T2grid` and `B1` to modify the default range and B1 offset (see assumptions above)
+
+**Example of simulated signal for T2=80ms based on previous slice profiles**
+<p align="center">
+<img src="docs/figures/T2_80ms_signal.png" alt="Simulated signal" width="75%"/>
+</p>
