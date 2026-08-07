@@ -17,3 +17,7 @@ Thumbs.db
 # Directories
 proprietary/
 __pycache__/
+
+# Files
+stimfit_path.txt
+checkpoint*

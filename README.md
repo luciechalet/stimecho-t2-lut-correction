@@ -30,7 +30,6 @@ Describes the sequence protocol. A BIDS sidecar produced by
 | Field | Type | Units | Meaning |
 |---|---|---|---|
 | `EchoTime` | array of numbers | seconds | The echo train. A single number is not enough — the LUT needs every echo. |
-| `RepetitionTime` | number | seconds | Defines the sequence TR. |
 | `FlipAngle` | number | degrees | By DICOM convention: nominal **refocusing** flip angle (180 for a standard spin echo). |
 | `SliceThickness` | number | millimetres | Sets the bounds of the simulated slice profile. |
 | `ProtocolName` | string | — | Identifies the protocol. |
@@ -45,6 +44,7 @@ Describes the sequence protocol. A BIDS sidecar produced by
 | `Manufacturer`, `ManufacturersModelName` | string | — | Scanner make and model. |
 | `MagneticFieldStrength` | number | tesla | |
 | `EchoTrainLength` | integer | — | Number of echoes. Must equal `len(EchoTime)`. |
+| `RepetitionTime` | number | seconds | Defines the sequence TR. |
 
 Any other keys are carried through and ignored.
 
@@ -122,4 +122,21 @@ own protocol.
 
 One waveform per pulse, giving the real slice profile. Siemens exports these as `.pta`; another vendor format may be substituted provided the LUT builder can read it. These are read with StimFit's `readRF_Siemens`.
 
+## Generating pulse profiles
 
+The function `build_opt_from_protocol.m` generates a slice profile for given input files as detailed above. 
+
+**Usage**
+```matlab
+P = 'proprietary_data_folder';
+opt = build_opt_from_protocol( ...
+        fullfile(P,'acquisition_parameters.json'), ...
+        fullfile(P,'pulse_properties.json'), ...
+        fullfile(P,'excitation_pulse.pta'), ...
+        fullfile(P,'refocusing_pulse.pta'), true);
+```
+
+Setting verbose to `true` will plot slice profiles obtained for a prescribed slice thickness and slice select gradient generated using StimFit bloch simulations. 
+
+**Example slice profile for 2mm slice thickness**
+![Slice profiles](docs/figures/slice_profiles.png)
