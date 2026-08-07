@@ -140,4 +140,6 @@ Setting verbose to `true` will plot slice profiles obtained for a prescribed sli
 
 **Example slice profile for 2mm slice thickness**
 
-<img src="docs/figures/slice_profiles.png" alt="Slice profiles" width="70%"/>
+<p align="center">
+<img src="docs/figures/slice_profiles.png" alt="Slice profiles" width="50%"/>
+</p>
