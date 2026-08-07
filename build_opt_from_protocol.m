@@ -4,7 +4,7 @@ function opt=build_opt_from_protocol(acq_json_path, pulse_json_path, RF_exc_path
         pulse_json_path (1,:) char
         RF_exc_path     (1,:) char
         RF_ref_path     (1,:) char
-        args.T1               = 1.3      % seconds; scalar or function handle of T2 % GM at 3T, Hagiwara et al. 2021
+        args.T1               = 1.33      % seconds; scalar or function handle of T2 % GM at 3T, Hagiwara et al. 2021
         args.verbose    (1,1) logical = false
     end
     
