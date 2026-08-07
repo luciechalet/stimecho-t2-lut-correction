@@ -139,4 +139,5 @@ opt = build_opt_from_protocol( ...
 Setting verbose to `true` will plot slice profiles obtained for a prescribed slice thickness and slice select gradient generated using StimFit bloch simulations. 
 
 **Example slice profile for 2mm slice thickness**
-![Slice profiles](docs/figures/slice_profiles.png)
+
+<img src="docs/figures/slice_profiles.png" alt="Slice profiles" width="70%"/>
