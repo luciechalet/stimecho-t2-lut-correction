@@ -1,4 +1,13 @@
-function opt=build_opt_from_protocol(acq_json_path, pulse_json_path, RF_exc_path, RF_ref_path, verbose)
+function opt=build_opt_from_protocol(acq_json_path, pulse_json_path, RF_exc_path, RF_ref_path, args)
+    arguments
+        acq_json_path   (1,:) char
+        pulse_json_path (1,:) char
+        RF_exc_path     (1,:) char
+        RF_ref_path     (1,:) char
+        args.T1               = 1.3      % seconds; scalar or function handle of T2 % GM at 3T, Hagiwara et al. 2021
+        args.verbose    (1,1) logical = false
+    end
+    
     % Dependencies: StimFit toolbox
     require_stimfit(); % add StimFit to path if not already there
     % Reads acquisition and pulse sequence parameters from the JSON
@@ -10,11 +19,8 @@ function opt=build_opt_from_protocol(acq_json_path, pulse_json_path, RF_exc_path
     %   pulse_json_path: path to JSON file containing pulse sequence descriptors (pulse angles and durations)
     %   RF_exc_path: path to RF excitation waveform file (provided by the manufacturer)
     %   RF_ref_path: path to RF reference waveform file (provided by the manufacturer)
-    %   verbose: plots slice profiles and prints information if true (default: false)
-
-    if nargin < 5 || isempty(verbose)
-        verbose = false;
-    end
+    %   args.T1: T1 value in seconds (scalar) or function handle of T2 (default: 1.3 s for GM at 3T, Hagiwara et al. 2021)
+    %   args.verbose: plots slice profiles and prints information if true (default: false)
 
     %% Read JSON files
     AcqParams   = jsondecode(fileread(acq_json_path));
@@ -80,8 +86,20 @@ function opt=build_opt_from_protocol(acq_json_path, pulse_json_path, RF_exc_path
     opt = StimFit_optset('s'); % 's' = slice-selective refocusing
     opt.esp   = esp;
     opt.etl   = numel(TE);
-    opt.debug = 0;                     % FSEsig opens a figure on every call otherwise
-    opt.T1    = @(T2)1.3;              % GM at 3T, Hagiwara et al. 2021
+    opt.debug = 0;                     % FSEsig opens a figure on every call otherwise            
+    if isa(args.T1,'function_handle')
+        opt.T1 = args.T1;
+    elseif isnumeric(args.T1) && isscalar(args.T1) && args.T1 > 0
+        if args.T1 > 20
+            error('build_opt_from_protocol:T1Units', ...
+                'T1 = %g looks like milliseconds; it must be in seconds.', args.T1);
+        end
+        T1val  = args.T1;          % capture the value, not the struct
+        opt.T1 = @(T2) T1val;
+    else
+        error('build_opt_from_protocol:BadT1', ...
+            'T1 must be a positive scalar (s) or a function handle of T2.');
+    end
 
     %% Define the slice profile simulation window
     d_slice=AcqParams.SliceThickness*0.1; % slice thickness in cm
@@ -111,7 +129,7 @@ function opt=build_opt_from_protocol(acq_json_path, pulse_json_path, RF_exc_path
     opt = getRF(opt);
 
     % Verbose output
-    if verbose
+    if args.verbose
         plot_slice_profiles(opt, AcqParams.SliceThickness);
     end
 
