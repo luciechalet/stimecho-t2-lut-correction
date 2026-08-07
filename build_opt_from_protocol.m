@@ -14,14 +14,17 @@ function opt=build_opt_from_protocol(acq_json_path, pulse_json_path, RF_exc_path
     % Reads RF waveforms from proprietary files
     % Returns opt structure created with StimFit optset and populated by parameters.
 
-    %  Input:
+    %  Inputs:
     %   acq_json_path: path to JSON sidecar of the acquisition (see JSON minimum requirements in README table)
     %   pulse_json_path: path to JSON file containing pulse sequence descriptors (pulse angles and durations)
     %   RF_exc_path: path to RF excitation waveform file (provided by the manufacturer)
     %   RF_ref_path: path to RF reference waveform file (provided by the manufacturer)
-    %   args.T1: T1 value in seconds (scalar) or function handle of T2 (default: 1.3 s for GM at 3T, Hagiwara et al. 2021)
+    %   args.T1: T1 value in seconds (scalar) or function handle of T2 (default: 1.33 s for GM at 3T, Hagiwara et al. 2021)
     %   args.verbose: plots slice profiles and prints information if true (default: false)
 
+    %  Outputs:
+    %   opt: StimFit options structure populated with the acquisition, pulse sequence parameters and corresponding slice profiles
+    
     %% Read JSON files
     AcqParams   = jsondecode(fileread(acq_json_path));
     PulseParams = jsondecode(fileread(pulse_json_path));
