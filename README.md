@@ -5,7 +5,7 @@ This toolbox creates a Look-Up-Table based on sequence parameters and slice prof
 This toolbox was developped to correct for T2 maps reconstructed with the GRAPPATINI Siemens sequence: the raw signal is not available and the T2 map is contaminated by stimulated echo times that cannot be corrected with a standard StimFit approach ([Lebel and Wilman, MRM 2010](https://doi.org/10.1002/mrm.22487)). 
 
 Note on assumptions: 
-- This approach has a known bias induced by unknown B1 inhomogeneity. B1 is set to an ideal value of 1, as no B1 map is available. The bias is systematic and always positive, meaning the corrected T2 remains overestimated where B1 is below 1. Simulations indicate an error on the inferred T2 of about +2 to +4 ms for a typical B1 of 0.85, rising to +5 to +6 ms at B1 = 0.80 and beyond +10 ms in regions where B1 falls to 0.65. The error increases with T2. Reference B1 values are taken from a joint StimFit fit of a comparable 3T brain acquisition(median B1 = 0.85), not from this protocol. Correcting this bias would require an acquiredB1 map and a LUT with an additional B1 dimension.
+- This approach has a known bias induced by unknown B1 inhomogeneity. B1 is set to an ideal value of 1, as no B1 map is available. The bias is systematic and always positive, meaning the corrected T2 remains overestimated where B1 is below 1. Simulations indicate an error on the inferred T2 of about +1 to +3 ms for a typical B1 of 0.85, rising to +2 to +5 ms at B1 = 0.80 and +6 to +16 ms in regions where B1 falls to 0.65. The error increases with T2. Reference B1 values are taken from a joint StimFit fit of a comparable 3T brain acquisition (median B1 = 0.85), not from this protocol. This represents the largest source of uncertainty for T2 > 50ms. Correcting this bias would require an acquired B1 map and a LUT with an additional B1 dimension.
 - The range of T2 values simulated for this LUT table is 20 to 200ms. This range may not match all field strength and tissue and may require adjustments.
 - The "GRAPPATINI" mode assumes that the monoexponential fit applied during reconstruction skipped the first echo of the multi echo train length and was reconstructed from complex data, hence the simulation do not account for a noise floor. Applying the model to other sequence schemes may require further adjustments.
 - The slice profile needs to be provided or simulated using proprietary waveform information as per [StimFit](https://github.com/usc-mrel/StimFit/tree/main).
@@ -13,8 +13,9 @@ Note on assumptions:
 - Inherited from the StimFit implementation: background field gradients are neglected, slice profiles are simulated with the slice-select gradient alone. Consequences: approximations will be weakest where susceptibility gradients are strong (orbitofrontal and temporal lobes).
 
 ## Dependencies
-- [StimFit](https://github.com/usc-mrel/StimFit): provides `StimFit_optset`, `readRF_Siemens`, `getRF`, `pulse_sim` and `FSEsig`. Not vendored and not modified by this toolbox.
+- [StimFit](https://github.com/usc-mrel/StimFit): provides `StimFit_optset`, `readRF_Siemens`, `getRF`, `pulse_sim` and `FSEsig`. 
 - MATLAB. Developed and tested on R2025a; the `arguments` block used by `build_opt_from_protocol.m` requires R2019b or later.
+- MATLAB Optimization Toolbox: provides ´lsqnonlin´ required by StimFit (´StimFit_optset´) and for monoexponential fitting.  
 
 **Which StimFit version.** Use the `fix/complex-tip-angle` branch([luciechalet/StimFit](https://github.com/luciechalet/StimFit/tree/fix/complex-tip-angle), submitted upstream as a pull request) until it is merged into `usc-mrel/StimFit`. It differs from upstream by a single function: `calcflipRF.m` computes the flip-angle profile as `acos(M_z)`, and rounding in the Bloch simulation can leave `M_z` a few eps above unity, in which case `acos` returns a complex value and complex flip angles propagate silently into `FSEsig`. The branch clamps `M_z` to [-1, 1] and warns if the excess is larger than rounding can explain.
 
@@ -180,3 +181,21 @@ Optionally: passing `T2grid` and `B1` to modify the default range and B1 offset 
 <p align="center">
 <img src="docs/figures/T2_80ms_signal.png" alt="Simulated signal" width="75%"/>
 </p>
+
+## Monoexponential fitting of the simulated signal
+While EPG simulation provides realistic signal for a given range of known T2 value, the resulting signal is fitted with a standard monoexponential strategy to build the LUT matching estimation to true T2. 
+
+The ´fit_monoexp´ function provides the T2 estimates for a given signal and TE array. Two standard fitting strategies are proposed ´nls´ for non linear least square fitting (default) and ´loglinear´ for log linear fitting. 
+
+**Usage**
+```matlab
+[T2, S0] = fit_monoexp(S, TE, 'method', 'nls', 'skipEcho', [1]);
+```
+
+Optionally, selected echoes in the echo train length may be skipped (default: no skipped echo, skipped echo must be positive integer or a comma-separated list of positive integers).
+
+**Example of monoexponential fits and divergence with true T2**
+<p align="center">
+<img src="docs/figures/fit_monoexp_methods.png" alt="Monoexponential fitting" width="75%"/>
+</p>
+
