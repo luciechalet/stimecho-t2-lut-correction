@@ -15,7 +15,7 @@ Note on assumptions:
 ## Dependencies
 - [StimFit](https://github.com/usc-mrel/StimFit): provides `StimFit_optset`, `readRF_Siemens`, `getRF`, `pulse_sim` and `FSEsig`. 
 - MATLAB. Developed and tested on R2025a; the `arguments` block used by `build_opt_from_protocol.m` requires R2019b or later.
-- MATLAB Optimization Toolbox: provides ´lsqnonlin´ required by StimFit (´StimFit_optset´) and for monoexponential fitting.  
+- MATLAB Optimization Toolbox: provides `lsqnonlin` required by StimFit (`StimFit_optset`) and for monoexponential fitting.  
 
 **Which StimFit version.** Use the `fix/complex-tip-angle` branch([luciechalet/StimFit](https://github.com/luciechalet/StimFit/tree/fix/complex-tip-angle), submitted upstream as a pull request) until it is merged into `usc-mrel/StimFit`. It differs from upstream by a single function: `calcflipRF.m` computes the flip-angle profile as `acos(M_z)`, and rounding in the Bloch simulation can leave `M_z` a few eps above unity, in which case `acos` returns a complex value and complex flip angles propagate silently into `FSEsig`. The branch clamps `M_z` to [-1, 1] and warns if the excess is larger than rounding can explain.
 
@@ -185,7 +185,7 @@ Optionally: passing `T2grid` and `B1` to modify the default range and B1 offset 
 ## Monoexponential fitting of the simulated signal
 While EPG simulation provides realistic signal for a given range of known T2 value, the resulting signal is fitted with a standard monoexponential strategy to build the LUT matching estimation to true T2. 
 
-The ´fit_monoexp´ function provides the T2 estimates for a given signal and TE array. Two standard fitting strategies are proposed ´nls´ for non linear least square fitting (default) and ´loglinear´ for log linear fitting. 
+The `fit_monoexp` function provides the T2 estimates for a given signal and TE array. Two standard fitting strategies are proposed `nls` for non linear least square fitting (default) and `loglinear` for log linear fitting. 
 
 **Usage**
 ```matlab
