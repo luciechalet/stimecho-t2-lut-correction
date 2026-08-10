@@ -37,11 +37,11 @@ StimFit must be on the MATLAB path. All functions requiring StimFit call `privat
 ## Inputs
 A LUT is created for a given protocol and must be updated if the protocol changes. Three input files are required to build the LUT: due to origins and sharing restrictions of proprietary data from scanner manufacturers, these files are not merged. 
 
-| # | File | Origin | Shareable |
-|---|------|--------|-----------|
-| 1 | Acquisition parameters JSON | Protocol extracted from the scanner / sequence data | Yes |
-| 2 | Pulse properties JSON | Manufacturer / might be provided with dicom metadata | No/Yes |
-| 3 | RF waveform files (`.pta`) | Manufacturer | No |
+| # | File | Origin |
+|---|------|--------|
+| 1 | Acquisition parameters JSON | Protocol extracted from the scanner / sequence data | 
+| 2 | Pulse properties JSON | Manufacturer / might be provided with dicom metadata | 
+| 3 | RF waveform files (`.pta`) | Manufacturer |
 
 ### 1. Acquisition parameters
 
