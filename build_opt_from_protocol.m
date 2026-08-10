@@ -30,7 +30,7 @@ function opt=build_opt_from_protocol(acq_json_path, pulse_json_path, RF_exc_path
     PulseParams = jsondecode(fileread(pulse_json_path));
 
     %% Acquisition parameters: check for minimum requirements
-    required_fields = {'EchoTime', 'FlipAngle', 'SliceThickness'};
+    required_fields = {'EchoTime', 'FlipAngle', 'SliceThickness', 'ProtocolName'};
     for req = 1:numel(required_fields)
         if ~isfield(AcqParams, required_fields{req})
             error('build_opt_from_protocol:MissingField', ...
@@ -96,7 +96,20 @@ function opt=build_opt_from_protocol(acq_json_path, pulse_json_path, RF_exc_path
     opt = StimFit_optset('s'); % 's' = slice-selective refocusing
     opt.esp   = esp;
     opt.etl   = numel(TE);
-    opt.debug = 0;                     % FSEsig opens a figure on every call otherwise            
+    opt.debug = 0;                     % FSEsig opens a figure on every call otherwise       
+    % create protocol identity associated with created LUT
+    identity = {'ProtocolName', 'SequenceName', 'SoftwareVersions', 'PulseSequenceDetails'};
+    present = isfield(AcqParams, identity);
+    opt.protocol = struct();
+    for id = find(present)
+        opt.protocol.(identity{id}) = AcqParams.(identity{id});
+    end
+    if any(~present)
+        warning('build_opt_from_protocol:PartialProtocolIdentity', ...
+            ['Acquisition JSON has no %s. The LUT will still build, but it will not ' ...
+             'record enough to know when it must be rebuilt.'], strjoin(identity(~present), ', '));
+    end
+    % Set T1 value or function of T2
     if isa(args.T1,'function_handle')
         opt.T1 = args.T1;
     elseif isnumeric(args.T1) && isscalar(args.T1) && args.T1 > 0
