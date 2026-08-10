@@ -25,7 +25,7 @@ function idx = parse_skipEcho(spec)
 
     if any(~isfinite(idx)) || any(idx < 1) || any(mod(idx,1) ~= 0)
         error('parse_skipEcho:BadSpec', ...
-            ['Invalid skipEcho. Expected a non negative integer or a comma-separated list of non-negative integers (e.g. "1,3,5").' ...
-            ' or an empty string; got "%s", parsed as "%s".'], string(spec), mat2str(idx));
+            ['Invalid skipEcho. Expected a positive integer or a comma-separated list of positive integers (e.g. "1,3,5").' ...
+            ' or an empty string; got "%s", parsed as "%s".'], mat2str(spec), mat2str(idx));
     end
     end
