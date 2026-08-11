@@ -210,3 +210,19 @@ The resulting LUT is a MATLAB struct optionally saved as a JSON file and reporti
 <img src="docs/figures/T2_LUT.png" alt="LUT" width="100%"/>
 </p>
 
+## Applying the LUT 
+The toolbox provides an `apply_T2_LUT` function which takes an apparent T2 array (e.g. GRAPPATINI T2 map), the LUT structure previously built, and an optional mask; and returns a LUT corrected T2 array of the same dimension. Voxels outside the provided mask, and voxels outside of the LUT range are set to NaN. Info provides proportions of voxels below, within, and above the provided LUT range.
+
+**Usage**
+```matlab
+[correctedT2, info] = apply_T2_LUT(apparentT2, LUT, 'mask', ROI_mask);
+```
+
+**Note**
+
+This toolbox those not provide code for loading T2 maps or saving the output file. For NIfTI format, one may use the MATLAB function niftiread and niftiwrite from the Image Processing and Computer Vision toolbox. 
+
+**Example of a T2map from a GRAPPATINI Siemens acquisition corrected using the LUT table**
+<p align="center">
+<img src="docs/figures/apply_T2_LUT.png" alt="LUT on GRAPPATINI" width="100%"/>
+</p>
