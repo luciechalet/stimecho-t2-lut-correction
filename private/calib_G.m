@@ -1,15 +1,16 @@
 function G = calib_G(RF, target_cm)
     %  Computes the slice select gradient for a given RF pulse and target slice thickness
-    %  Usage: G = calib_G(RF, target_cm)
-    %  Input:
-    %  RF: RF waveform structure with fields:
-    %      .RF: RF waveform (G)
-    %      .tau: pulse duration (s)
-    %      .angle: prescribed nutation angle (degrees)
-    %  target_cm: desired slice thickness (cm)
-    %  Output:
-    %  G: slice select gradient (G/cm)
-    %  Solves for G such that the simulated FWHM equals the prescribed slice thickness.
+    %  Usage:
+    %       G = calib_G(RF, target_cm)
+    %  Inputs:
+    %       RF: RF waveform structure with fields:
+    %           .RF: RF waveform (G)
+    %           .tau: pulse duration (s)
+    %           .angle: prescribed nutation angle (degrees)
+    %       target_cm: desired slice thickness (cm)
+    %  Outputs:
+    %       G: slice select gradient (G/cm)
+    %       Solves for G such that the simulated FWHM equals the prescribed slice thickness.
     RF.G = 1;
     z = linspace(-5, 5, 20001); %cm
     RF = calcflipRF(RF, z, 0);

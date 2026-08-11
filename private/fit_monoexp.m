@@ -5,20 +5,19 @@ function [T2, S0] = fit_monoexp(S, TE, args)
         args.method (1,:) char {mustBeMember(args.method,{'nls','loglinear'})} = 'nls'  % Fitting method
         args.skipEcho                                                          = [] % Echoes to skip when applying fit
     end
-    % Fit a monoexponential |S| = A*exp(-TE/T2) 
-    %  [T2, S0] = fit_monoexp(S, TE, 'method', 'nls', 'skipEcho', []); For non least squares fitting (default) without skipping any echoes (default)
-    %  [T2, S0] = fit_monoexp(S, TE, 'method', 'nls', 'skipEcho', [1]); For non least squares fitting (default) while skipping the first echo (GRAPPATINI)
-    %  [T2, S0] = fit_monoexp(S, TE, 'method', 'loglinear', 'skipEcho', []); For log-linear fitting without skipping any echoes (default)
-
+    % Fit a monoexponential |S| = A*exp(-TE/T2)
+    % Usage:
+    %       [T2, S0] = fit_monoexp(S, TE, 'method', 'nls', 'skipEcho', []); For non least squares fitting (default) without skipping any echoes (default)
+    %       [T2, S0] = fit_monoexp(S, TE, 'method', 'nls', 'skipEcho', [1]); For non least squares fitting (default) while skipping the first echo (GRAPPATINI)
+    %       [T2, S0] = fit_monoexp(S, TE, 'method', 'loglinear', 'skipEcho', []); For log-linear fitting without skipping any echoes (default)
     % Inputs:
-    %  S: Signal vector (amplitude) of size (nEchoes,1)
-    %  TE: Echo times vector of size (nEchoes,1)
-    %  args.method: Fitting method, either 'nls' (non-linear least squares) or 'loglinear' (log-linear regression) (default: 'nls')
-    %  args.skipEcho: Vector of echo indices to skip when applying the fit (default: [])
-
+    %       S: Signal vector (amplitude) of size (nEchoes,1)
+    %       TE: Echo times vector of size (nEchoes,1)
+    %       args.method: Fitting method, either 'nls' (non-linear least squares) or 'loglinear' (log-linear regression) (default: 'nls')
+    %       args.skipEcho: Vector of echo indices to skip when applying the fit (default: [])
     % Outputs:
-    %  T2: Fitted T2 value, in the same units as TE
-    %  S0: Fitted S0 value (amplitude at TE=0)
+    %       T2: Fitted T2 value, in the same units as TE
+    %       S0: Fitted S0 value (amplitude at TE=0)
 
     %% Select echoes to fit
     if numel(S) ~= numel(TE)

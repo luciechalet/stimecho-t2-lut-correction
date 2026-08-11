@@ -7,37 +7,34 @@ function [LUT, S, TE] = build_T2_LUT(opt, args)
         args.method (1,:) char {mustBeMember(args.method,{'nls','loglinear'})} = 'nls'
         args.outdir (1,:) char = '' % build only, write nothing
     end
-    % Build the T2 lookup table (LUT) for predifined slice profiles and acquisition parameters
-    %   [LUT, S, TE] = build_T2_LUT(opt)
-    %   [LUT, S, TE] = build_T2_LUT(opt, 'T2grid', 10:1:300, 'B1', 1, 'skipEcho', [], 'method', 'nls') 
-
+    % Build the T2 lookup table (LUT) for predefined slice profiles and acquisition parameters
+    % Usage:
+    %       [LUT, S, TE] = build_T2_LUT(opt)
+    %       [LUT, S, TE] = build_T2_LUT(opt, 'T2grid', 10:1:300, 'B1', 1, 'skipEcho', [], 'method', 'nls') 
+    % Inputs:
+    %       opt: struct built from build_opt_from_protocol.m (Slice profile already generated with getRF.m)
+    %       args.T2grid: range of true T2 values to simulate (in ms of the form: min:step:max, default: 10:1:300)
+    %       args.B1: B1 field inhomogeneity, assumed constant and set to ideal 1, see assumptions in README for more information.
+    %       args.skipEcho: Vector of echo indices to skip when applying the fit or integer for single echo (default: [])
+    %       args.method: Fitting method, either 'nls' (non-linear least squares) or 'loglinear' (log-linear regression) (default: 'nls')
+    %       args.outdir: directory to write the LUT JSON file (default: '' for build only, write nothing)
+    % Outputs:
+    %       LUT: Lookup table of apparent T2 values (ms) for each true T2 value in args.T2grid
+    %       S: Simulated signal for each true T2 value in args.T2grid
+    %       TE: Echo times for the simulated signal
     % Dependencies: StimFit toolbox
     require_stimfit(); % add StimFit to path if not already there
-
-    % Inputs:
-    %  opt: struct built from build_opt_from_protocol.m (Slice profile already generated with getRF.m)
-    %  args.T2grid: range of true T2 values to simulate (in ms of the form: min:step:max, default: 10:1:300)
-    %  args.B1: B1 field inhomogeneity, assumed constant and set to ideal 1, see assumptions in README for more information.
-    %  args.skipEcho: Vector of echo indices to skip when applying the fit or integer for single echo (default: [])
-    %  args.method: Fitting method, either 'nls' (non-linear least squares) or 'loglinear' (log-linear regression) (default: 'nls')
-    %  args.outdir: directory to write the LUT JSON file (default: '' for build only, write nothing)
-
-    % Outputs:
-    %  LUT: Lookup table of apparent T2 values (ms) for each true T2 value in args.T2grid
-    %  S: Simulated signal for each true T2 value in args.T2grid
-    %  TE: Echo times for the simulated signal
-
     %% Sanity check
-    assert(isfield(opt,'RFe') && isfield(opt.RFe,'alpha'), ...
+    assert(isfield(opt,'RFe') && isfield(opt.RFe,'alpha'), 'build_T2_LUT:NoSliceProfiles', ...
         'opt carries no slice profiles - was it built by build_opt_from_protocol?');
 
-    assert(numel(opt.RFe.alpha) == opt.Nz && numel(opt.RFr.alpha) == opt.Nz, ...
+    assert(numel(opt.RFe.alpha) == opt.Nz && numel(opt.RFr.alpha) == opt.Nz, 'build_T2_LUT:StaleSliceProfiles', ...
         'Slice profiles are stale or missing - re-run getRF(opt) after changing Dz/Nz.');
     
-    assert(issorted(args.T2grid,'strictascend'), ...
+    assert(issorted(args.T2grid,'strictascend'), 'build_T2_LUT:UnsortedGrid', ...
         'T2grid must be strictly increasing - the apply step inverts it with interp1.');    
 
-    assert(isfield(opt,'protocol') && isfield(opt.protocol,'ProtocolName'), ...
+    assert(isfield(opt,'protocol') && isfield(opt.protocol,'ProtocolName'), 'build_T2_LUT:NoProtocol', ...
         'opt carries no protocol identity - rebuild it with build_opt_from_protocol.');
 
 

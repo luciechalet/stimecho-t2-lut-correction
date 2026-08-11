@@ -2,11 +2,15 @@ function idx = parse_skipEcho(spec)
     % This function parses the skipEcho string and returns the indices of the echoes to skip.
     % The skipEcho string can be a comma-separated list of indices (e.g "1,3,5").
     % The function returns a vector of indices to skip
-
-    %   idx = parse_skipEcho("")    -> []        (skip nothing)
-    %   idx = parse_skipEcho("1")   -> 1
-    %   idx = parse_skipEcho("1,3") -> [1 3]
-    %   idx = parse_skipEcho(1)     -> 1       
+    % Usage:
+    %       idx = parse_skipEcho("")    -> []        (skip nothing)
+    %       idx = parse_skipEcho("1")   -> 1
+    %       idx = parse_skipEcho("1,3") -> [1 3]
+    %       idx = parse_skipEcho(1)     -> 1   
+    % Inputs:
+    %       spec: string or numeric, specifying the echoes to skip
+    % Outputs:
+    %       idx: vector of indices to skip (empty if none)    
 
     if isnumeric(spec)
         idx = double(spec(:)).';

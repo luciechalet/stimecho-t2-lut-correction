@@ -2,7 +2,7 @@
 
 This toolbox creates a Look-Up-Table based on sequence parameters and slice profile using EPG simulations for a range of plausible T2 values in the human brain at 3T. 
 
-This toolbox was developped to correct for T2 maps reconstructed with the GRAPPATINI Siemens sequence: the raw signal is not available and the T2 map is contaminated by stimulated echo times that cannot be corrected with a standard StimFit approach ([Lebel and Wilman, MRM 2010](https://doi.org/10.1002/mrm.22487)). 
+This toolbox was developed to correct for T2 maps reconstructed with the GRAPPATINI Siemens sequence: the raw signal is not available and the T2 map is contaminated by stimulated echo times that cannot be corrected with a standard StimFit approach ([Lebel and Wilman, MRM 2010](https://doi.org/10.1002/mrm.22487)). 
 
 Note on assumptions: 
 - This approach has a known bias induced by unknown B1 inhomogeneity. B1 is set to an ideal value of 1, as no B1 map is available. The bias is systematic and always positive, meaning the corrected T2 remains overestimated where B1 is below 1. Simulations indicate an error on the inferred T2 of about +1 to +3 ms for a typical B1 of 0.85, rising to +2 to +5 ms at B1 = 0.80 and +6 to +16 ms in regions where B1 falls to 0.65. The error increases with T2. Reference B1 values are taken from a joint StimFit fit of a comparable 3T brain acquisition (median B1 = 0.85), not from this protocol. This represents the largest source of uncertainty for T2 > 50ms. Correcting this bias would require an acquired B1 map and a LUT with an additional B1 dimension.
@@ -94,7 +94,7 @@ Any other keys are carried through and ignored.
 
 **Producing the acquisition JSON**
 
-May be written out by hand from the table above, or using a dcm2bids sidecar. In the event that the echo train is missing, the sidecare may be merged with a protocol printout (fonctionality only tested with Siemens protocol PDF printout):
+May be written out by hand from the table above, or using a dcm2bids sidecar. In the event that the echo train is missing, the sidecar may be merged with a protocol printout (functionality only tested with Siemens protocol PDF printout):
 
 ```bash
 python utils/populate_json_sidecar_from_PDF.py <sidecar.json> <protocol.pdf> -o <out.json>
@@ -120,7 +120,7 @@ RF pulse durations and the excitation flip angle may not be provided in dicom me
 | `Excitation.PulseDurationUnits` | string | — | `"s"`. |
 | `Refocusing.*` | | | The same four fields for the refocusing pulse. |
 
-`Refocusing.FlipAngle` duplicates `FlipAngle` in the acquisition JSON on purpose the two are cross-checked, and a mismatch means the wrong pulse file has been paired with the protocol.
+`Refocusing.FlipAngle` duplicates `FlipAngle` in the acquisition JSON on purpose, the two are cross-checked, and a mismatch means the wrong pulse file has been paired with the protocol.
 
 **Example.** The durations below are placeholders; substitute the values for your
 own protocol.
@@ -205,12 +205,12 @@ Optionally, selected echoes in the echo train length may be skipped (default: no
 ### Look up table
 The resulting LUT is a MATLAB struct optionally saved as a JSON file and reporting all protocol information and toolbox options selected to build it. 
 
-**Example of LUT, it's sensitivity to tissue T1 and local slope of the mapping**
+**Example of LUT, its sensitivity to tissue T1 and local slope of the mapping**
 <p align="center">
 <img src="docs/figures/T2_LUT.png" alt="LUT" width="100%"/>
 </p>
 
-## Applying the LUT 
+## Applying the LUT
 The toolbox provides an `apply_T2_LUT` function which takes an apparent T2 array (e.g. GRAPPATINI T2 map), the LUT structure previously built, and an optional mask; and returns a LUT corrected T2 array of the same dimension. Voxels outside the provided mask, and voxels outside of the LUT range are set to NaN. Info provides proportions of voxels below, within, and above the provided LUT range.
 
 **Usage**
@@ -220,7 +220,7 @@ The toolbox provides an `apply_T2_LUT` function which takes an apparent T2 array
 
 **Note**
 
-This toolbox those not provide code for loading T2 maps or saving the output file. For NIfTI format, one may use the MATLAB function niftiread and niftiwrite from the Image Processing and Computer Vision toolbox. 
+This toolbox does not provide code for loading T2 maps or saving the output file. For NIfTI format, one may use the MATLAB function niftiread and niftiwrite from the Image Processing and Computer Vision toolbox. 
 
 **Example of a T2map from a GRAPPATINI Siemens acquisition corrected using the LUT table**
 <p align="center">
