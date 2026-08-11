@@ -1,7 +1,7 @@
 function [LUT, S, TE] = build_T2_LUT(opt, args)
     arguments
         opt         (1,1) struct
-        args.T2grid (1,:) double {mustBePositive} = 10:1:500            
+        args.T2grid (1,:) double {mustBePositive} = 10:1:300            
         args.B1     (1,1) double {mustBeInRange(args.B1,0.1,2)} = 1     
         args.skipEcho = []
         args.method (1,:) char {mustBeMember(args.method,{'nls','loglinear'})} = 'nls'
@@ -9,14 +9,14 @@ function [LUT, S, TE] = build_T2_LUT(opt, args)
     end
     % Build the T2 lookup table (LUT) for predifined slice profiles and acquisition parameters
     %   [LUT, S, TE] = build_T2_LUT(opt)
-    %   [LUT, S, TE] = build_T2_LUT(opt, 'T2grid', 20:1:200, 'B1', 1, 'skipEcho', [], 'method', 'nls') 
+    %   [LUT, S, TE] = build_T2_LUT(opt, 'T2grid', 10:1:300, 'B1', 1, 'skipEcho', [], 'method', 'nls') 
 
     % Dependencies: StimFit toolbox
     require_stimfit(); % add StimFit to path if not already there
 
     % Inputs:
     %  opt: struct built from build_opt_from_protocol.m (Slice profile already generated with getRF.m)
-    %  args.T2grid: range of true T2 values to simulate (in ms of the form: min:step:max, default: 10:1:500)
+    %  args.T2grid: range of true T2 values to simulate (in ms of the form: min:step:max, default: 10:1:300)
     %  args.B1: B1 field inhomogeneity, assumed constant and set to ideal 1, see assumptions in README for more information.
     %  args.skipEcho: Vector of echo indices to skip when applying the fit or integer for single echo (default: [])
     %  args.method: Fitting method, either 'nls' (non-linear least squares) or 'loglinear' (log-linear regression) (default: 'nls')
