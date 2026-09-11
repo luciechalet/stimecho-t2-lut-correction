@@ -216,18 +216,22 @@ The resulting LUT is a MATLAB struct optionally saved as a JSON file and reporti
 
 Anyone acquiring **this same protocol** can correct their maps without needing StimFit or the vendor waveform files. 
 
-**A LUT is valid for one protocol only.** It encodes the echo spacing, the echo train length, the flip angles and the simulated slice profiles of the acquisition it was built from.
+**What the waveform is specified for.** The manufacturer states that this RF pulse is intended for GRAPPATINI acquisitions in **Low SAR** mode, at static fields **up to 3 T**, and for slice thicknesses **above 1 mm**. That is the envelope in which the pulse itself is valid, and it is not the range over which this LUT is valid: the table was built at one point inside that envelope — 3 T, 2 mm, Low SAR — and any other point needs its own table, even where the pulse would still be a legitimate choice.
 
-Note from the manufacturer on the pulse RF waveform used in this protocol: This pulse is applied to GRAPPATINI acquisition in Low SAR mode, for static fields up to 3T and for slice thickness above 1mm. If an imaging protocol differs in either of these 3 criteria, the shipped LUT is likely incompatible.
+**A LUT is valid for one protocol only.** It encodes the echo spacing, the echo train length, the flip angles and the simulated slice profiles of the acquisition it was built from. Applied to an acquisition it does not describe, it still returns a smooth, monotone, entirely plausible map — there is no error, no `NaN`, and nothing in the output that reveals the mistake. Seven fields are therefore compared between the LUT and the acquisition:
 
-Note that if the shipped LUT is applied to data with an incompatible protocol, it will still return a smooth, monotone, entirely plausible map — there is no error, no `NaN`, and nothing in the output that reveals the mistake. Four fields must therefore match between the LUT and the acquisition's BIDS sidecar:
+| Field | Source | Why it matters |
+|---|---|---|
+| `ProtocolName` | sidecar | names the protocol; the one field that must be present |
+| `SequenceName` | sidecar | the sequence itself |
+| `SoftwareVersions` | sidecar | a sequence can change across a scanner software update |
+| `PulseSequenceDetails` | sidecar | the WIP / customer sequence actually loaded |
+| `MagneticFieldStrength` | sidecar | the T1 the LUT assumes is a 3 T value. Compared to within 5%, so a sidecar reading 2.89362 and one reading 3 count as the same magnet |
+| `SliceThickness` | sidecar | sets the bounds of the simulated slice profile, so a different slice is a different table |
+| `RFPulseType` | printout | which waveform the scanner played — `Low SAR` here. Not a BIDS field: `utils/populate_json_sidecar_from_PDF.py` reads it from the protocol printout and stores it under `SiemensProtocolPrintout` |
 
-| Field | Why it matters |
-|---|---|
-| `ProtocolName` | names the protocol |
-| `SequenceName` | the sequence itself |
-| `SoftwareVersions` | a sequence can change across a scanner software update |
-| `PulseSequenceDetails` | the WIP / customer sequence actually loaded |
+A field that either file does not carry is reported as **unverified**, with a warning naming it, rather than counted as a match. A plain `dcm2niix` sidecar has no `RFPulseType`, so that is the ordinary case rather than a fault.
+
 
 Check them explicitly rather than by eye:
 
