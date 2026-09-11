@@ -17,7 +17,6 @@ Thumbs.db
 # Directories
 proprietary/
 __pycache__/
-LUT/
 
 # Files
 stimfit_path.txt
