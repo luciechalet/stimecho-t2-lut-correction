@@ -210,6 +210,39 @@ The resulting LUT is a MATLAB struct optionally saved as a JSON file and reporti
 <img src="docs/figures/T2_LUT.png" alt="LUT" width="100%"/>
 </p>
 
+## The LUT provided with this toolbox
+
+`LUT/T2LUT_T2MAP_adapted_from_GRAPPATINI_T1-1330ms_B1-100_skip1_nls.json` is the table built for the GRAPPATINI protocol described above: grey-matter T1 of 1.33 s, nominal B1 = 1, first echo skipped, non-linear least squares, true T2 simulated over 10-300 ms. The file records these parameters alongside the protocol identity, the RF waveform file names, and the commit of each repository used to build it.
+
+Anyone acquiring **this same protocol** can correct their maps without needing StimFit or the vendor waveform files. 
+
+**A LUT is valid for one protocol only.** It encodes the echo spacing, the echo train length, the flip angles and the simulated slice profiles of the acquisition it was built from.
+
+Note from the manufacturer on the pulse RF waveform used in this protocol: This pulse is applied to GRAPPATINI acquisition in Low SAR mode, for static fields up to 3T and for slice thickness above 1mm. If an imaging protocol differs in either of these 3 criteria, the shipped LUT is likely incompatible.
+
+Note that if the shipped LUT is applied to data with an incompatible protocol, it will still return a smooth, monotone, entirely plausible map — there is no error, no `NaN`, and nothing in the output that reveals the mistake. Four fields must therefore match between the LUT and the acquisition's BIDS sidecar:
+
+| Field | Why it matters |
+|---|---|
+| `ProtocolName` | names the protocol |
+| `SequenceName` | the sequence itself |
+| `SoftwareVersions` | a sequence can change across a scanner software update |
+| `PulseSequenceDetails` | the WIP / customer sequence actually loaded |
+
+Check them explicitly rather than by eye:
+
+```matlab
+LUT = jsondecode(fileread(fullfile('LUT','T2LUT_T2MAP_adapted_from_GRAPPATINI_T1-1330ms_B1-100_skip1_nls.json')));
+acq = jsondecode(fileread('sub-01_acq-GRAPPATINI_T2map.json'));
+
+check_LUT_compatibility(LUT, acq);   % errors on a mismatch, warns on fields the sidecar lacks
+[correctedT2, info] = apply_T2_LUT(apparentT2, LUT, 'mask', brainmask);
+```
+
+`apply_T2_LUT` does not perform this check itself: it takes arrays and a decoded table, never a sidecar, and is deliberately kept free of file and metadata handling. The check is a separate, explicit step, and worth keeping in any script that applies a LUT.
+
+If the fields do not match, the table has to be rebuilt for your own protocol with `build_T2_LUT`, which needs StimFit and the vendor RF waveform files for that sequence (see Inputs).
+
 ## Applying the LUT
 The toolbox provides an `apply_T2_LUT` function which takes an apparent T2 array (e.g. GRAPPATINI T2 map), the LUT structure previously built, and an optional mask; and returns a LUT corrected T2 array of the same dimension. Voxels outside the provided mask, and voxels outside of the LUT range are set to NaN. Info provides proportions of voxels below, within, and above the provided LUT range.
 
