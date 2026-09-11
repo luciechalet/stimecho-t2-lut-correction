@@ -97,7 +97,8 @@ function opt=build_opt_from_protocol(acq_json_path, pulse_json_path, RF_exc_path
     opt.etl   = numel(TE);
     opt.debug = 0;                     % FSEsig opens a figure on every call otherwise       
     % create protocol identity associated with created LUT
-    identity = {'ProtocolName', 'SequenceName', 'SoftwareVersions', 'PulseSequenceDetails'};
+    identity = {'ProtocolName', 'SequenceName', 'SoftwareVersions', 'PulseSequenceDetails', ...
+                'MagneticFieldStrength', 'SliceThickness'};
     present = isfield(AcqParams, identity);
     opt.protocol = struct();
     for id = find(present)
@@ -108,6 +109,17 @@ function opt=build_opt_from_protocol(acq_json_path, pulse_json_path, RF_exc_path
             ['Acquisition JSON has no %s. The LUT will still build, but it will not ' ...
              'record enough to know when it must be rebuilt.'], strjoin(identity(~present), ', '));
     end
+    % RF pulse type decides which waveform the scanner played, and the waveform is
+    % what the slice profile - and therefore the whole LUT - is built from. It is not
+    % a BIDS field: populate_json_sidecar_from_PDF.py lifts it from the Siemens
+    % printout and nests it, so look in both places and accept its absence.
+    if isfield(AcqParams, 'SiemensProtocolPrintout') && ...
+            isfield(AcqParams.SiemensProtocolPrintout, 'RFPulseType')
+        opt.protocol.RFPulseType = AcqParams.SiemensProtocolPrintout.RFPulseType;
+    elseif isfield(AcqParams, 'RFPulseType')
+        opt.protocol.RFPulseType = AcqParams.RFPulseType;
+    end
+
     % Set T1 value or function of T2
     if isa(args.T1,'function_handle')
         opt.T1 = args.T1;
