@@ -209,6 +209,74 @@ slope = diff(G.ApparentT2(:)) ./ diff(G.TrueT2(:));
 check(abs(min(slope) - 1.0261) < 5e-4, sprintf('min local slope %.4f - above 1, so the inversion never amplifies noise', min(slope)));
 
 %% ------------------------------------------------------------------ %%
+%  check_LUT_compatibility - base MATLAB only
+%% ------------------------------------------------------------------ %%
+fprintf('\ncheck_LUT_compatibility\n');
+
+% The acquisition side is written out here rather than read from the LUT, so
+% this compares against known values instead of the file against itself.
+% RFPulseType sits in the printout block, which is where the PDF tool puts it
+% and where a plain dcm2niix sidecar has nothing at all.
+acq = struct( ...
+    'ProtocolName',          'T2MAP_adapted_from_GRAPPATINI', ...
+    'SequenceName',          'WIP_se2d16', ...
+    'SoftwareVersions',      'syngo MR E11', ...
+    'PulseSequenceDetails',  '%CustomerSeq%\accT2map_wip899c', ...
+    'MagneticFieldStrength', 3, ...
+    'SliceThickness',        2, ...
+    'SiemensProtocolPrintout', struct('RFPulseType', 'Low SAR'));
+
+rep = check_LUT_compatibility(G, acq);
+check(numel(rep.Matched) == 7 && isempty(rep.Unverified), 'the shipped LUT matches all seven identity fields');
+
+wrongs = { 'ProtocolName',          'T2MAP_something_else'
+           'SequenceName',          'WIP_se2d32'
+           'SoftwareVersions',      'syngo MR XA30'
+           'PulseSequenceDetails',  '%CustomerSeq%\accT2map_wip900d'
+           'MagneticFieldStrength', 1.5
+           'SliceThickness',        3 };
+for k = 1:size(wrongs,1)
+    bad = acq;  bad.(wrongs{k,1}) = wrongs{k,2};
+    check_error(@() check_LUT_compatibility(G, bad), 'check_LUT_compatibility:ProtocolMismatch', ...
+        sprintf('a different %s is refused', wrongs{k,1}));
+end
+bad = acq;  bad.SiemensProtocolPrintout.RFPulseType = 'Normal';
+check_error(@() check_LUT_compatibility(G, bad), 'check_LUT_compatibility:ProtocolMismatch', ...
+    'a different RFPulseType is refused - the pulse is what the slice profile comes from');
+
+% 2.89362 T and 3 T are the same magnet written two ways; 1.5 T is not, and is
+% caught by the loop above.
+near = acq;  near.MagneticFieldStrength = 2.89362;
+accepted = true;
+try
+    repNear = check_LUT_compatibility(G, near);
+catch
+    accepted = false;      % a mismatch here is the failure this check is about
+end
+check(accepted && numel(repNear.Matched) == 7, '2.89362 T and 3 T count as the same field strength');
+
+% A hand-written sidecar may put RFPulseType at the top level instead.
+flat = rmfield(acq, 'SiemensProtocolPrintout');  flat.RFPulseType = 'Low SAR';
+repFlat = check_LUT_compatibility_quietly(G, flat);
+check(numel(repFlat.Matched) == 7, 'RFPulseType is found at the top level too');
+
+check_error(@() check_LUT_compatibility(G, rmfield(acq,'ProtocolName')), 'check_LUT_compatibility:NoProtocolName', ...
+    'an acquisition with no ProtocolName cannot be matched');
+check_error(@() check_LUT_compatibility(struct('TrueT2',1), acq), 'check_LUT_compatibility:NoProtocol', ...
+    'a struct that is not one of our LUTs is refused');
+odd = acq;  odd.SliceThickness = [2 2 2];
+check_error(@() check_LUT_compatibility(G, odd), 'check_LUT_compatibility:NotComparable', ...
+    'a value that is neither text nor one number is refused rather than compared loosely');
+
+% A thinner sidecar still matches on what it carries, and must say what it could not check.
+thin = rmfield(acq, {'SequenceName','SoftwareVersions','SiemensProtocolPrintout'});
+check_warning(@() check_LUT_compatibility(G, thin), 'check_LUT_compatibility:Unverified', ...
+    'a sidecar missing identity fields warns rather than passing silently');
+repThin = check_LUT_compatibility_quietly(G, thin);
+check(isequal(repThin.Unverified, {'SequenceName','SoftwareVersions','RFPulseType'}), ...
+    'and names the fields it could not check');
+
+%% ------------------------------------------------------------------ %%
 %  Worked example - the shipped table, end to end
 %% ------------------------------------------------------------------ %%
 fprintf('\nworked example (%s)\n', G.Protocol.ProtocolName);
@@ -251,6 +319,23 @@ function check(cond, name)
     else
         error('release_tests:Failed', 'FAIL  %s', name);
     end
+end
+
+function check_warning(f, expected_id, name)
+    % Same idea as check_error, for a guard that warns instead of throwing.
+    orig = warning('off', expected_id);
+    restore = onCleanup(@() warning(orig)); %#ok<NASGU>
+    lastwarn('', '');
+    f();
+    [~, got] = lastwarn;
+    check(strcmp(got, expected_id), sprintf('%s [%s]', name, expected_id));
+end
+
+function r = check_LUT_compatibility_quietly(varargin)
+    % The warning is the point of the check above; here only the report is.
+    orig = warning('off', 'check_LUT_compatibility:Unverified');
+    restore = onCleanup(@() warning(orig)); %#ok<NASGU>
+    r = check_LUT_compatibility(varargin{:});
 end
 
 function check_error(f, expected_id, name)
