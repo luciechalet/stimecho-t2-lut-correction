@@ -232,18 +232,14 @@ Anyone acquiring **this same protocol** can correct their maps without needing S
 
 A field that either file does not carry is reported as **unverified**, with a warning naming it, rather than counted as a match. A plain `dcm2niix` sidecar has no `RFPulseType`, so that is the ordinary case rather than a fault.
 
-
-Check them explicitly rather than by eye:
+Verify the compatibility:
 
 ```matlab
 LUT = jsondecode(fileread(fullfile('LUT','T2LUT_T2MAP_adapted_from_GRAPPATINI_T1-1330ms_B1-100_skip1_nls.json')));
 acq = jsondecode(fileread('sub-01_acq-GRAPPATINI_T2map.json'));
 
 check_LUT_compatibility(LUT, acq);   % errors on a mismatch, warns on fields the sidecar lacks
-[correctedT2, info] = apply_T2_LUT(apparentT2, LUT, 'mask', brainmask);
 ```
-
-`apply_T2_LUT` does not perform this check itself: it takes arrays and a decoded table, never a sidecar, and is deliberately kept free of file and metadata handling. The check is a separate, explicit step, and worth keeping in any script that applies a LUT.
 
 If the fields do not match, the table has to be rebuilt for your own protocol with `build_T2_LUT`, which needs StimFit and the vendor RF waveform files for that sequence (see Inputs).
 
@@ -254,12 +250,14 @@ The toolbox provides an `apply_T2_LUT` function which takes an apparent T2 array
 ```matlab
 [correctedT2, info] = apply_T2_LUT(apparentT2, LUT, 'mask', ROI_mask);
 ```
+**Units:** 
+`apply_T2_LUT` expects apparent T2 in milliseconds. The GRAPPATINI export stores it as int16 in **ms × 10** (recorded only in the DICOM `ImageComments`, `"T2 Map [ms x10]"`; `scl_slope` is unset), so divide by 10 first — and note a wrong factor of 10 does not produce an all-`NaN` map, so the `NaN` count is not a check on units.
 
-**Note**
-
+**Note:**
 This toolbox does not provide code for loading T2 maps or saving the output file. For NIfTI format, one may use the MATLAB function niftiread and niftiwrite from the Image Processing and Computer Vision toolbox. 
 
 **Example of a T2map from a GRAPPATINI Siemens acquisition corrected using the LUT table**
 <p align="center">
 <img src="docs/figures/apply_T2_LUT.png" alt="LUT on GRAPPATINI" width="100%"/>
 </p>
+
