@@ -100,6 +100,8 @@ May be written out by hand from the table above, or using a dcm2bids sidecar. In
 python utils/populate_json_sidecar_from_PDF.py <sidecar.json> <protocol.pdf> -o <out.json>
 ```
 
+`utils/populate_json_sidecar_from_PDF.py` requires **Python ≥ 3.7** and the standard library only — no packages to install. It shells out to `pdftotext`, so **poppler-utils** must be on `PATH` (`apt install poppler-utils`, or `brew install poppler`).
+
 The sidecar is authoritative: fields present in both are kept from the sidecar and any disagreement is reported, not silently resolved. `EchoTime` is the exception and is taken from the printout (a sidecar written for a single echo holds only that echo's TE). Use `--force` to change which keys may be overwritten, `-i` to edit in place, and no flag at all to print to stdout without writing anything.
 
 The tool will throw an error if the printout and the sidecar name different protocols.
