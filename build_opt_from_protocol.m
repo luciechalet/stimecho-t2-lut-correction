@@ -211,7 +211,7 @@ z  = linspace(opt.Dz(1), opt.Dz(2), opt.Nz) * 10;   % cm -> mm
 ae = abs(opt.RFe.alpha) * 180/pi;                   % alpha is in radians
 ar = abs(opt.RFr.alpha) * 180/pi;
 
-figure('Name','build_opt_from_protocol: slice profiles');
+figure('Name','build_opt_from_protocol: slice profiles', 'Position',[100 100 560 380]);
 plot(z, ae, 'LineWidth', 1.5); hold on;
 plot(z, ar, 'LineWidth', 1.5);
 yline(max(ae)/2, '--'); yline(max(ar)/2, '--');
