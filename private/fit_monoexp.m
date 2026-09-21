@@ -48,6 +48,15 @@ function [T2, S0] = fit_monoexp(S, TE, args)
     switch args.method
         case 'loglinear'
             % Log-linear regression: log(S) = log(S0) - TE/T2
+            % A slice-integrated signal can change sign once the spin-echo pathway
+            % has decayed; abs() above folds it back up, and log-linear weights the
+            % smallest echoes most, so the fit is dominated by that folded value.
+            if any(S(keep) <= 0)
+                warning('fit_monoexp:NonPositiveEchoes', ...
+                    ['loglinear: %d of %d fitted echoes are <= 0 and were folded by abs(); ' ...
+                     'this fit weights the smallest echoes most, so T2 here is unreliable.'], ...
+                    nnz(S(keep) <= 0), numel(keep));
+            end
             T2 = -1/p(1);
             S0 = exp(p(2));
         case 'nls'
