@@ -207,7 +207,7 @@ Optionally, selected echoes in the echo train length may be skipped (default: no
 ### Look up table
 The resulting LUT is a MATLAB struct optionally saved as a JSON file and reporting all protocol information and toolbox options selected to build it. 
 
-**Example of LUT, its sensitivity to tissue T1 and local slope of the mapping**
+**Example of LUT, its sensitivity to tissue T1 and to transmit inhomogeneity**
 <p align="center">
 <img src="docs/figures/T2_LUT.png" alt="LUT" width="100%"/>
 </p>
