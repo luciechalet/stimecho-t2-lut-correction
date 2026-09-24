@@ -1,11 +1,13 @@
 function [LUT, S, TE] = build_T2_LUT(opt, args)
     arguments
         opt         (1,1) struct
-        args.T2grid (1,:) double {mustBePositive} = 10:1:300            
-        args.B1     (1,1) double {mustBeInRange(args.B1,0.1,2)} = 1     
+        args.T2grid (1,:) double {mustBePositive} = 10:1:300
+        args.T1grid (1,:) double {mustBePositive} = []   % seconds, [] = use the T1 already in opt (1-D LUT as before)
+        args.B1     (1,:) double {mustBeInRange(args.B1,0.1,2)} = 1   % scalar, or a grid for a B1 axis
         args.skipEcho = []
         args.method (1,:) char {mustBeMember(args.method,{'nls','loglinear'})} = 'nls'
         args.outdir (1,:) char = '' % build only, write nothing
+        args.parallel (1,1) logical = false   % true: spread simulations over a parallel pool (Parallel Computing Toolbox)
     end
     % Build the T2 lookup table (LUT) for predefined slice profiles and acquisition parameters
     % Usage:
@@ -34,38 +36,69 @@ function [LUT, S, TE] = build_T2_LUT(opt, args)
     assert(issorted(args.T2grid,'strictascend'), 'build_T2_LUT:UnsortedGrid', ...
         'T2grid must be strictly increasing - the apply step inverts it with interp1.');    
 
+    assert(issorted(args.T1grid,'strictascend') && issorted(args.B1,'strictascend'), 'build_T2_LUT:UnsortedGrid', ...
+        'T1grid and B1 must be strictly increasing - the apply step interpolates along them.');
+
+    assert(all(args.T1grid < 20), 'build_T2_LUT:T1Units', ...
+        'T1grid looks like milliseconds; it must be in seconds.');
+
     assert(isfield(opt,'protocol') && isfield(opt.protocol,'ProtocolName'), 'build_T2_LUT:NoProtocol', ...
         'opt carries no protocol identity - rebuild it with build_opt_from_protocol.');
 
 
-    %% Building T2 LUT
-    T2grid = args.T2grid;
-    TE     = (opt.esp:opt.esp:opt.esp*opt.etl).';
-    S      = zeros(opt.etl, numel(T2grid));    
+    %% Building T2 LUT: simulate and fit for every (T2, T1, B1) combination
+    T2grid   = args.T2grid;
+    T1grid   = args.T1grid;
+    B1grid   = args.B1;
+    method   = args.method;       % plain variables rather than args.x: parfor sends them to each worker once
+    skipEcho = args.skipEcho;
+    TE       = (opt.esp:opt.esp:opt.esp*opt.etl).';
+    TEms     = TE * 1000;         % the LUT is in ms
+    nT2  = numel(T2grid);
+    nT1  = max(1, numel(T1grid)); % 1 when T1 comes from opt
+    nB1  = numel(B1grid);
+    nSim = nT2 * nT1 * nB1;
 
-    for k = 1:numel(T2grid)
-        S(:,k) = FSEsig(T2grid(k)*1e-3, args.B1, 0, opt);   % ms -> s; Gbg = 0 (see assumptions in README for more information)
+    nWorkers = 0;                 % 0 = ordinary serial loop, no pool
+    if args.parallel
+        assert(license('test', 'Distrib_Computing_Toolbox') && ~isempty(ver('parallel')), ...
+            'build_T2_LUT:NoParallel', 'parallel = true needs the Parallel Computing Toolbox.');
+        pool = gcp;               % reuse the running pool, or start one
+        nWorkers = pool.NumWorkers;
     end
 
-    %% Fit the monoexponential model to each simulated signal
-    TEms = TE * 1000;              % build_T2_LUT returns TE in s; the LUT is in ms
-    apparent_T2 = zeros(size(T2grid));
-    for k = 1:numel(T2grid)
-        apparent_T2(k) = fit_monoexp(S(:,k), TEms, 'method', args.method, 'skipEcho', args.skipEcho);
+    % One flat loop over all combinations, so parfor can hand them out freely
+    S_all   = zeros(opt.etl, nSim);
+    app_all = zeros(1, nSim);
+    parfor (i = 1:nSim, nWorkers)
+        [k, j, b] = ind2sub([nT2 nT1 nB1], i);   % flat index -> (T2, T1, B1) indices
+        optj = opt;
+        if ~isempty(T1grid)
+            optj.T1 = @(T2) T1grid(j);           % same pattern as build_opt_from_protocol
+        end
+        s = FSEsig(T2grid(k)*1e-3, B1grid(b), 0, optj);   % ms -> s; Gbg = 0 (see README)
+        S_all(:,i) = s;
+        app_all(i) = fit_monoexp(s, TEms, 'method', method, 'skipEcho', skipEcho);
+    end
+    S           = reshape(S_all,   opt.etl, nT2, nT1, nB1);
+    apparent_T2 = reshape(app_all, nT2, nT1, nB1);
+
+    % Each (T1, B1) curve must be invertible on its own
+    for j = 1:nT1
+        for b = 1:nB1
+            col = apparent_T2(:,j,b);
+            if ~issorted(col, 'strictascend')
+                bad = find(diff(col) <= 0, 1);
+                if isempty(T1grid), T1val = opt.T1(T2grid(bad)*1e-3); else, T1val = T1grid(j); end
+                error('build_T2_LUT:NotInvertible', ...
+                    ['Apparent T2 is not strictly increasing at T1 = %g s, B1 = %g ' ...
+                     '(true %g -> %.4f ms, then %g -> %.4f ms).'], ...
+                    T1val, B1grid(b), T2grid(bad), col(bad), T2grid(bad+1), col(bad+1));
+            end
+        end
     end
 
-    if ~issorted(apparent_T2,'strictascend')
-        bad = find(diff(apparent_T2) <= 0, 1);
-        error('build_T2_LUT:NotInvertible', ...
-            ['Apparent T2 is not strictly increasing (true %g -> %.4f ms, then %g -> %.4f ms). ' ...
-             'The apply step inverts this curve with interp1, which needs a one-to-one map.'], ...
-            T2grid(bad), apparent_T2(bad), T2grid(bad+1), apparent_T2(bad+1));
-    end
-
-    %% Build LUT 
-    T1_s = arrayfun(opt.T1, T2grid*1e-3); % T1 is a function of T2, convert ms -> s
-
-    % Create LUT structure
+    %% Create LUT structure
     LUT = struct();
     LUT.Description = 'Apparent (monoexponential) vs True T2 from EPG simulation of the protocol.';
     LUT.Protocol = opt.protocol;
@@ -74,11 +107,21 @@ function [LUT, S, TE] = build_T2_LUT(opt, args)
     LUT.ApparentT2 = apparent_T2;
     LUT.FitMethod = args.method;
     LUT.SkipEcho = parse_skipEcho(args.skipEcho);
-    if all(T1_s == T1_s(1))
-        LUT.T1_s = T1_s(1);
+    if isempty(args.T1grid)
+        T1_s = arrayfun(opt.T1, T2grid*1e-3);    % T1 from opt: one value, or one per T2
+        if all(T1_s == T1_s(1))
+            LUT.T1_s = T1_s(1);
+        else
+            LUT.T1_s = T1_s;
+        end
     else
-        LUT.T1_s = T1_s;
+        LUT.T1_s = args.T1grid;                  % T1 axis
     end
+    % Axes of ApparentT2 that are grids. ApparentT2 is always ordered (TrueT2, T1, B1);
+    % a T1 or B1 not listed here has a length-1 dimension, and T1_s then records the T1 used.
+    LUT.ApparentT2Dims = {'TrueT2'};
+    if ~isempty(args.T1grid), LUT.ApparentT2Dims{end+1} = 'T1_s'; end
+    if numel(args.B1) > 1,    LUT.ApparentT2Dims{end+1} = 'B1';   end
     LUT.B1 = args.B1;
     LUT.EchoSpacing_s = opt.esp;
     LUT.EchoTrainLength = opt.etl;
@@ -132,7 +175,9 @@ end
 
 function name = lutfilename(LUT)
     % Create LUT filename based on protocol name 
-    if isscalar(LUT.T1_s)
+    if any(strcmp('T1_s', LUT.ApparentT2Dims))
+        T1tag = sprintf('T1-%d-%dms', round(LUT.T1_s([1 end])*1000));
+    elseif isscalar(LUT.T1_s)
         T1tag = sprintf('T1-%dms', round(LUT.T1_s*1000));
     else
         T1tag = 'T1-funcT2';
@@ -142,7 +187,11 @@ function name = lutfilename(LUT)
     else
         skiptag = ['skip' char(strjoin(string(LUT.SkipEcho), '-'))];
     end
-    B1tag = sprintf('B1-%03d', round(LUT.B1*100));
+    if isscalar(LUT.B1)
+        B1tag = sprintf('B1-%03d', round(LUT.B1*100));
+    else
+        B1tag = sprintf('B1-%03d-%03d', round(LUT.B1([1 end])*100));
+    end
     protocoltag = regexprep(LUT.Protocol.ProtocolName, '[^\w-]', '_');
     name = sprintf('T2LUT_%s_%s_%s_%s_%s.json', protocoltag, T1tag, B1tag, skiptag, LUT.FitMethod);
 end

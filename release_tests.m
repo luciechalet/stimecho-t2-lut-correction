@@ -147,6 +147,48 @@ delete(tmp);
 check(isequal(apply_T2_LUT(appAxis, decoded), back), 'a LUT round-tripped through JSON behaves identically');
 
 %% ------------------------------------------------------------------ %%
+%  apply_T2_LUT with T1 and B1 axes - base MATLAB only
+%% ------------------------------------------------------------------ %%
+fprintf('\napply_T2_LUT, T1 and B1 axes\n');
+
+L3 = jsondecode(jsonencode(synthetic_LUT3()));   % through JSON, like a real file
+t3 = L3.TrueT2(:);
+a3 = synthetic_LUT3().ApparentT2(:,2,2);         % the curve at T1 = 1.3 s, B1 = 0.9
+on = @(v) v*ones(size(a3));
+inner = t3 >= 20 & t3 <= 290;                    % the ends can be NaN by design (edge of neighbouring curves)
+
+% Round trip on a grid point: the correction must return the true axis.
+c3 = apply_T2_LUT(a3, L3, 'T1map', on(1.3), 'B1map', on(0.9));
+check(max(abs(c3(inner) - t3(inner))) < 1e-6 && ~any(isnan(c3(inner))), ...
+    sprintf('round trip on a (T1, B1) grid point (max %.2e ms)', max(abs(c3(inner) - t3(inner)))));
+
+% The maps must actually be used: same apparent T2, different B1, different answer.
+cB = apply_T2_LUT(a3, L3, 'T1map', on(1.3), 'B1map', on(1.0));
+check(min(abs(cB(inner) - c3(inner))) > 0.1, 'a different B1 gives a different correction');
+
+% Outside the grid is NaN, and counted.
+[cO, iO] = apply_T2_LUT(a3, L3, 'T1map', on(1.3), 'B1map', on(0.5));
+check(all(isnan(cO)) && iO.OutsideB1GridVoxels == numel(a3), 'B1 outside the grid gives NaN and is counted');
+
+% A single-value axis is dropped, not interpolated over.
+L1 = L3;  L1.T1_s = 1.3;  L1.ApparentT2 = L3.ApparentT2(:,2,:);
+c1 = apply_T2_LUT(a3, L1, 'B1map', on(0.9));
+check(max(abs(c1(inner) - c3(inner))) < 1e-9, 'a LUT with one T1 value needs only the B1 map');
+
+% T1 given as a function of T2 stores one T1 per T2 in T1_s: a record, not an axis.
+Lf = synthetic_LUT();  Lf.T1_s = 0.5*Lf.TrueT2/1000 + 1.5;
+check(isequal(apply_T2_LUT(80, Lf), apply_T2_LUT(80, synthetic_LUT())), 'a per-T2 T1_s is read as a record, not an axis');
+check_error(@() apply_T2_LUT(80, Lf, 'T1map', 1.3), 'apply_T2_LUT:UnusedMap', 'and a T1 map is refused for it');
+
+% Guards.
+check_error(@() apply_T2_LUT(a3, L3, 'B1map', on(0.9)), 'apply_T2_LUT:MissingMap', 'a T1 axis without a T1 map is refused');
+check_error(@() apply_T2_LUT(a3, L1, 'T1map', on(1.3), 'B1map', on(0.9)), 'apply_T2_LUT:UnusedMap', 'a map the LUT has no axis for is refused, not ignored');
+check_error(@() apply_T2_LUT(80, synthetic_LUT(), 'B1map', 1), 'apply_T2_LUT:UnusedMap', 'maps passed to a 1-D LUT are refused');
+check_error(@() apply_T2_LUT(a3, L3, 'T1map', on(1.3), 'B1map', 0.9), 'apply_T2_LUT:MapSizeMismatch', 'a map must be on the T2 grid');
+check_error(@() apply_T2_LUT(a3, L3, 'T1map', on(1300), 'B1map', on(0.9)), 'apply_T2_LUT:T1Units', 'a T1 map in ms is rejected');
+check_error(@() apply_T2_LUT(a3, L3, 'T1map', on(1.3), 'B1map', on(90)), 'apply_T2_LUT:B1Units', 'a B1 map in percent is rejected');
+
+%% ------------------------------------------------------------------ %%
 %  LUT/ - the tables actually shipped with the repository
 %% ------------------------------------------------------------------ %%
 fprintf('\nshipped LUT files\n');
@@ -311,6 +353,32 @@ function LUT = synthetic_LUT()
         'SkipEcho',    1, ...
         'T1_s',        1.33, ...
         'B1',          1);
+end
+
+function LUT = synthetic_LUT3()
+    % Same fields and shape as a LUT with T1 and B1 axes, made up rather than
+    % simulated. Each (T1, B1) curve is a monotone line with apparent > true, and
+    % its slope changes with T1 and B1, so reading the wrong curve gives a
+    % different answer.
+    trueT2 = (10:1:300).';
+    T1 = [0.8 1.3 4.3];
+    B1 = [0.8 0.9 1.0];
+    App = zeros(numel(trueT2), numel(T1), numel(B1));
+    for j = 1:numel(T1)
+        for b = 1:numel(B1)
+            App(:,j,b) = trueT2 + 0.5 + (0.03 + 0.01*T1(j) + 0.1*(1 - B1(b)))*trueT2;
+        end
+    end
+    LUT = struct( ...
+        'Description',    'Synthetic 3-D LUT for release_tests - not a real correction.', ...
+        'T2Units',        'ms', ...
+        'TrueT2',         trueT2.', ...
+        'ApparentT2',     App, ...
+        'FitMethod',      'nls', ...
+        'SkipEcho',       1, ...
+        'T1_s',           T1, ...
+        'B1',             B1, ...
+        'ApparentT2Dims', {{'TrueT2', 'T1_s', 'B1'}});   % {{ }}: one cell as the field value
 end
 
 function check(cond, name)

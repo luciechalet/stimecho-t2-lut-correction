@@ -1,22 +1,26 @@
 # Stimulated-echo T2 LUT correction
 
 This toolbox creates a Look-Up-Table based on sequence parameters and slice profile using EPG simulations for a range of plausible T2 values in the human brain at 3T. 
+T1 and B1 can optionally be added as further axes of the table when maps of these parameters were acquired alongside the T2 map.
 
 This toolbox was developed to correct for T2 maps reconstructed with the GRAPPATINI Siemens sequence: the raw signal is not available and the T2 map is contaminated by stimulated echo times that cannot be corrected with a standard StimFit approach ([Lebel and Wilman, MRM 2010](https://doi.org/10.1002/mrm.22487)). 
 
-Note on assumptions: 
-- This approach has a known bias induced by unknown B1 inhomogeneity. B1 is set to its nominal value of 1, meaning the pulses are assumed to deliver exactly the flip angles the protocol prescribes; no B1 map is available for this protocol. Nominal is not a maximum: at 3T the transmit calibration makes the flip angle correct on average over the head, so the delivered angle sits above 1 in some regions and below it in others. The bias is systematic and always positive below 1, meaning the corrected T2 remains overestimated where the delivered flip angle falls short. Simulations indicate an error on the inferred T2 of about +1 to +3 ms for a typical B1 of 0.85, rising to +2 to +5 ms at B1 = 0.80 and +6 to +16 ms in regions where B1 falls to 0.65. The error increases with T2. The response either side of the nominal is strongly asymmetric, so the direction of the error matters as much as its size: over the 30-130 ms band, B1 = 1.05 or 1.10 costs at most 0.4 ms (and in the opposite direction, a slight over-correction), and even B1 = 1.30 stays under 3 ms, against +3.5 ms at B1 = 0.85 and +16.5 ms at B1 = 0.65. This represents the largest source of uncertainty for T2 > 50ms. Correcting this bias would require an acquired B1 map and a LUT with an additional B1 dimension. Note also that StimFit fits a single flip-angle scaling, so its "B1" absorbs simulated-slice-profile and gradient-calibration error alongside true transmit inhomogeneity. A value fitted that way describes the acquisition it came from rather than the transmit field alone, which is why 0.85 is quoted here as an indication of scale and this LUT still assumes B1=1.
+**Note on assumptions**: 
+- *B1 (transmit inhomogeneity), optional axis:* By default the LUT assumes B1 = 1, its nominal value, meaning the pulses are assumed to deliver exactly the flip angles the protocol prescribes. Nominal is not a maximum: the delivered angle sits above 1 in some regions and below 1 in others. Within the 30-130 ms band the bias is systematic and positive below 1 (corrected T2 remains overestimated where B1<1). Simulations indicate an error on the inferred T2 of about +1 to +3 ms for a typical B1 of 0.85, rising to +2 to +5 ms at B1 = 0.80 and +6 to +16 ms in regions where B1 falls to 0.65. The error increases with T2. Conversely, over the 30-130 ms band, B1 = 1.05 or 1.10 costs at most 0.4 ms, and B1 = 1.30 stays under 3 ms (corrected T2 is underestimated where B1>1). This represents the largest source of uncertainty for T2 > 50 ms. Note that at the bottom of the simulated range the sign reverses: at true T2 = 10 ms and B1 = 0.8 the apparent T2 is 9.0 ms.
+If a B1 map was acquired in the same session as the T2 map, the LUT can optionally be built over a B1 grid and the map passed to `apply_T2_LUT`. The result then depends on the accuracy of the B1 map, and on whether the map and the simulation describe the same flip angle: the map measures the transmit field, while the simulated flip angle also depends on the modelled slice profile (see the accompanying paper). 
+Note also that StimFit fits a single flip-angle scaling, so its "B1" absorbs simulated-slice-profile and gradient-calibration error alongside true transmit inhomogeneity. A value fitted that way describes the acquisition it came from rather than the transmit field alone, which is why 0.85 is quoted here as an indication of scale and the provided LUT assumes B1 = 1.
 - The range of T2 values simulated for this LUT table is 10 to 300ms, which is wider than the grey matter (GM) and white matter (WM) tissue target for T2 correction. Within this wider range, long T2 voxels (e.g. cerebrospinal fluid, CSF) are included in the LUT correction at the cost of T1 assumptions (see T1 assumptions below). The bias it removes runs from +0.5ms at T2=10ms to +13.8ms at T2=300ms and +2.8 to +8ms within the 30-130ms band for GM and WM tissue. This range may not match all field strength and tissue and may require adjustments.
 - The "GRAPPATINI" mode assumes that the monoexponential fit applied during reconstruction skipped the first echo of the multi echo train length and was reconstructed from complex data, hence the simulation do not account for a noise floor. Applying the model to other sequence schemes may require further adjustments.
 - The slice profile needs to be provided or simulated using proprietary waveform information as per [StimFit](https://github.com/usc-mrel/StimFit/tree/main).
-- A single T1 value is considered per LUT file (default is grey matter T1=1.33s according to [Hagiwara et al. 2021](https://doi.org/10.1097/RLI.0000000000000720)). Stimulated echoes are contaminated by T1 relaxation: magnetization is stored along the longitudinal axis between refocusing pulses, where it relaxes according to T1 rather than T2. The value of T1 therefore scales the bias corrected by this LUT. The default LUT is scoped to **grey matter**, and applying it to white matter (T1 ≈ 0.83 s at 3T) carries a known bias measured at less than 0.7ms across the 30-130ms tissue band: The WM and GM LUTs differ by *at most* 0.69ms; and correcting WM using a GM LUT corrects by 0.08 to 0.66ms too low compared to a WM specific LUT. LUT files for different T1 may be generated by specifying T1 in the `build_opt_from_protocol` call. Two LUT files may be built and each applied within its own segmentation label. 
-- Beyond the 30-130ms tissue band, the T1 scope has a higher impact. At true T2=300ms, applying a GM LUT to voxels with CSF T1 (4.3s) returns a T2 value too high by up to 3.2ms and a WM tissue T1 with a GM LUT would return a value too low by up to 2.7ms. Long T2 voxels are therefore corrected, but under a T1 value that does not describe them, the corrected values should be read as indicative rather than quantitative.
+- *T1, optional axis:* Stimulated echoes are contaminated by T1 relaxation: magnetization is stored along the longitudinal axis between refocusing pulses, where it relaxes according to T1 rather than T2. The value of T1 therefore scales the bias corrected by this LUT. By default a single T1 is used per LUT file (grey matter, T1 = 1.33 s, [Hagiwara et al. 2021](https://doi.org/10.1097/RLI.0000000000000720)), and the provided LUT is scoped to **grey matter**. Applying it to white matter (T1 ≈ 0.83 s at 3T) carries a known bias measured at less than 0.7 ms across the 30-130 ms tissue band: the WM and GM LUTs differ by *at most* 0.69 ms, and correcting WM using a GM LUT corrects by 0.08 to 0.66 ms too low compared to a WM specific LUT. Without a T1 map, a different single T1 can be set in the `build_opt_from_protocol` call, and one LUT built and applied per segmentation label. If a T1 map was acquired in the same session as the T2 map, the LUT can optionally be built over a T1 grid and the map passed to `apply_T2_LUT`; the result then depends on the accuracy of that T1 map, which this toolbox does not assess. T1 is always given in seconds (see Units).
+- Beyond the 30-130ms tissue band, the T1 scope has a higher impact. At true T2=300ms, applying a GM LUT to voxels with CSF T1 (4.3s) returns a T2 value too high by up to 3.2ms and a WM tissue T1 with a GM LUT would return a value too low by up to 2.7ms. Long T2 voxels are therefore corrected, but under a T1 value that does not describe them, the corrected values should be read as indicative rather than quantitative. When a T1 map is used and the T1 grid reaches CSF values (e.g. up to 4.5 s), long T2 voxels are corrected, and the accuracy of the T1 map in CSF then takes the place of this assumption.
 - Inherited from the StimFit implementation: background field gradients are neglected, slice profiles are simulated with the slice-select gradient alone. Consequences: approximations will be weakest where susceptibility gradients are strong (orbitofrontal and temporal lobes).
 
 ## Dependencies
 - [StimFit](https://github.com/usc-mrel/StimFit): provides `StimFit_optset`, `readRF_Siemens`, `getRF`, `pulse_sim` and `FSEsig`. 
 - MATLAB. Developed and tested on R2025a; the `arguments` block used by `build_opt_from_protocol.m` requires R2019b or later.
 - MATLAB Optimization Toolbox: provides `lsqnonlin` required by StimFit (`StimFit_optset`) and for monoexponential fitting.  
+- MATLAB Parallel Computing Toolbox (optional): only for `'parallel', true` in `build_T2_LUT`.
 
 **Which StimFit version** 
 
@@ -182,6 +186,12 @@ The function `build_T2_LUT.m` runs EPG simulation for a given range of T2 values
 
 Optionally: passing `T2grid` and `B1` to modify the default range and B1 offset (see assumptions above) as well as fitting parameters as detailed in the sub section below.
 
+**Parallel computing.** Each simulated (T2, T1, B1) combination is independent, and `'parallel', true` spreads them over a parallel pool (requires the MATLAB Parallel Computing Toolbox). The result is identical to the serial run. Starting the pool has a fixed cost, so parallel mode only pays off for large tables: the number of simulations is `numel(T2grid) × numel(T1grid) × numel(B1)`, and parallel mode is recommended above roughly 2,500 simulations — about 8 (T1, B1) pairs on the default T2 grid — or whenever a pool is already running (`gcp('nocreate')` returns a pool). Measured on an 8-worker local pool: 11 ms per simulation serial, 1.4 ms parallel, and about 23 s to start the pool; the full 13 × 15 (T1, B1) grid takes about 11 min serial and under 2 min in parallel. These timings depend on the number of cores available.
+
+```matlab
+[LUT, S, TE] = build_T2_LUT(opt, 'T1grid', [0.6:0.2:2.0, 2.5:0.5:4.5], 'B1', 0.6:0.05:1.3, 'skipEcho', [1], 'method', 'nls', 'parallel', true, 'outdir', 'LUT');
+```
+
 **Example of simulated signal for T2=80ms based on previous slice profiles**
 <p align="center">
 <img src="docs/figures/T2_80ms_signal.png" alt="Simulated signal" width="75%"/>
@@ -206,10 +216,25 @@ Optionally, selected echoes in the echo train length may be skipped (default: no
 
 ### Look up table
 The resulting LUT is a MATLAB struct optionally saved as a JSON file and reporting all protocol information and toolbox options selected to build it. 
+Built with a `T1grid` and/or a `B1` grid, `ApparentT2` is a 3-D array, always ordered (true T2, T1, B1). `ApparentT2Dims` lists which of these are grids. When it contains `T1_s`, the field is the T1 grid in seconds; otherwise the T1 dimension has length 1 and `T1_s` records the T1 used. The same holds for `B1`. 
 
 **Example of LUT, its sensitivity to tissue T1 and to transmit inhomogeneity**
 <p align="center">
 <img src="docs/figures/T2_LUT.png" alt="LUT" width="100%"/>
+</p>
+
+**Example of two-parameter LUTs (optional T1 or B1 axis)**
+
+Each table adds one axis to the default one and keeps the other parameter at its default value. Colours and labelled contours give the bias the table corrects (apparent − true T2, in ms); the solid line marks where the default single-parameter LUT sits, the dashed black line where the bias changes sign (short T2 and low B1), and the dotted lines the 30-130 ms band.
+<p align="center">
+<img src="docs/figures/T2_LUT_2params.png" alt="Two-parameter LUTs" width="100%"/>
+</p>
+
+**Example of a three-parameter LUT (optional T1 and B1 axes)**
+
+The first three panels are slices of the table at true T2 = 30, 80 and 130 ms, showing the relative bias (% above true T2) over T1 and B1 on a shared colour scale; the cross marks the default T1 = 1.33 s, B1 = 1. The last panel gives the interpolation error of the correction, measured halfway between grid points over the 30-130 ms band, one square per measurement, with the LUT grid in grey (`checkpoint_step6_grid_accuracy.m`).
+<p align="center">
+<img src="docs/figures/T2_LUT_3params.png" alt="Three-parameter LUT" width="100%"/>
 </p>
 
 ## The LUT provided with this toolbox
@@ -252,6 +277,12 @@ The toolbox provides an `apply_T2_LUT` function which takes an apparent T2 array
 ```matlab
 [correctedT2, info] = apply_T2_LUT(apparentT2, LUT, 'mask', ROI_mask);
 ```
+
+**With T1 and B1 maps**
+```matlab
+[correctedT2, info] = apply_T2_LUT(apparentT2, LUT, 'mask', ROI_mask, 'T1map', T1map, 'B1map', B1map);
+```
+
 **Units:** 
 `apply_T2_LUT` expects apparent T2 in milliseconds. The GRAPPATINI export stores it as int16 in **ms × 10** (recorded only in the DICOM `ImageComments`, `"T2 Map [ms x10]"`; `scl_slope` is unset), so divide by 10 first — and note a wrong factor of 10 does not produce an all-`NaN` map, so the `NaN` count is not a check on units.
 
