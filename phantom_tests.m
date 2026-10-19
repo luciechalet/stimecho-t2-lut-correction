@@ -2,20 +2,22 @@
 %
 %   Run from the repository root:   matlab -batch phantom_tests
 %
-%   Needs the phantom DICOM and BIDS folders, looked for in the sibling folder
-%   ../test_data/GRAPPATINI/phantom. Skips, without failing, when they are absent.
-%   No StimFit and no proprietary/ needed.
+%   Uses the de-identified test set shipped in data/phantom (three
+%   DICOM files and two dcm2niix sidecars, see its README). 
 
 fprintf('\nphantom_tests: %s\n\n', datetime('now','Format','yyyy-MM-dd HH:mm:ss'));
 
 here    = fileparts(mfilename('fullpath'));
-phantom = fullfile(fileparts(here), 'test_data', 'GRAPPATINI', 'phantom');
-dcm     = fullfile(phantom, 'DICOM');
-anat    = fullfile(phantom, 'bids', 'sub-phantom', 'ses-20261012', 'anat');
+shipped = fullfile(here, 'data', 'phantom');
+if isfolder(shipped)
+    dcm  = fullfile(shipped, 'dcm');
+    anat = fullfile(shipped, 'sidecars');
+end
 if ~isfolder(dcm) || ~isfolder(anat)
-    fprintf('phantom_tests skipped: phantom data not found under %s\n\n', phantom);
+    fprintf('phantom_tests skipped: no phantom data in %s\n\n', shipped);
     return
 end
+fprintf('data: %s\n\n', fileparts(dcm));
 
 %% ------------------------------------------------------------------ %%
 %  acquisition_json_from_DICOM
