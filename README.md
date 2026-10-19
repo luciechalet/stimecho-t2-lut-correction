@@ -97,8 +97,13 @@ Any other keys are carried through and ignored.
 ```
 
 **Producing the acquisition JSON**
+When the DICOM is available, the acquisition JSON is read from the Siemens protocol header:
+```matlab
+acq = acquisition_json_from_DICOM('path/to/DICOM', 'SeriesNumber', 7, 'OutputFile', 'acq.json');
+```
+The folder may be flat or nested. SeriesNumber is required when it holds several series (multiple runs with identical protocol name). Identity fields are written similarly to  dcm2niix, so a LUT built from DICOM matches ordinary BIDS sidecars. The RF pulse type is recorded as the scanner's code, RFPulseTypeCode (e.g. 4), since DICOM doesn't store the type only. Tested on Siemens syngo XA61 (Enhanced MR); classic per-slice DICOM is untested.
 
-May be written out by hand from the table above, or using a dcm2bids sidecar. In the event that the echo train is missing, the sidecar may be merged with a protocol printout (functionality only tested with Siemens protocol PDF printout):
+The acquisition json may also be written out by hand from the table above, or using a dcm2bids sidecar. In the event that the echo train is missing, the sidecar may be merged with a protocol printout (functionality only tested with Siemens protocol PDF printout):
 
 ```bash
 python utils/populate_json_sidecar_from_PDF.py <sidecar.json> <protocol.pdf> -o <out.json>
