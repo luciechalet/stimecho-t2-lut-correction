@@ -306,4 +306,4 @@ This toolbox does not provide code for loading T2 maps or saving the output file
 </p>
 
 ## Licence
-Code: MIT (`LICENSE`). Test data in `data/`: CC-BY-4.0 (see the `LICENSE` in data folder).
+Code: MIT (`LICENSE`). Test data (data/phantom) will be released under CC-BY-4.0 after approval.
