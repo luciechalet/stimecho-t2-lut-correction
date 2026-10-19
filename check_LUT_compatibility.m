@@ -1,29 +1,47 @@
-function report = check_LUT_compatibility(LUT, acq)
+function report = check_LUT_compatibility(LUT, acq, args)
     arguments
         LUT (1,1) struct
-        acq (1,1) struct
+        acq                                  % struct, JSON file path, or DICOM folder
+        args.SeriesNumber double = []        % DICOM folder only: which series to check
     end
     % Check the LUT compatibility with acquired data.
     % A LUT is only valid for the protocol it was built from: applying one built
     % for a different protocol returns a smooth, plausible and wrong map, with no
     % error and nothing in the output to reveal it. This is the check that catches it.
     % Usage:
-    %       check_LUT_compatibility(LUT, acq);            % errors on any mismatch
-    %       report = check_LUT_compatibility(LUT, acq);   % also returns what was compared
+    %       check_LUT_compatibility(LUT, acq);                         % errors on any mismatch
+    %       report = check_LUT_compatibility(LUT, acq);                % also returns what was compared
+    %       check_LUT_compatibility(LUT, 'sub-01_T2map.json');         % a sidecar or acquisition JSON
+    %       check_LUT_compatibility(LUT, 'DICOM', 'SeriesNumber', 7);  % a Siemens DICOM folder
     % Inputs:
     %       LUT: LUT structure, e.g. jsondecode(fileread('LUT/T2LUT_....json'))
-    %       acq: acquisition parameters, e.g. jsondecode(fileread('sub-01_T2map.json'))
+    %       acq: acquisition parameters - a struct, e.g. jsondecode(fileread('sub-01_T2map.json')),
+    %            the path of such a JSON file, or a DICOM folder read by acquisition_json_from_DICOM
+    %       args.SeriesNumber: series to read from a DICOM folder (required when it holds several)
     % Outputs:
     %       report: struct with .Matched (fields compared and equal) and
     %               .Unverified (identity fields one of the two does not carry)
+    % Notes:
+    %       The echo train is compared whenever the acquisition lists every echo
+    %       (EchoTime with two or more values): always from a DICOM folder, never from a
+    %       dcm2niix sidecar of a GRAPPATINI map, which carries no echo times. Two
+    %       protocols can share every identity field and differ only in echo spacing.
+
+    acq = resolve_acquisition(acq, args.SeriesNumber);
 
     % Fields build_T2_LUT always writes: absent from the LUT means the file is
     % not one of ours.
-    core  = {'ProtocolName', 'SequenceName', 'SoftwareVersions', 'PulseSequenceDetails'};
-    % Fields recorded since 2026-09-11, checked whenever both sides carry them.
-    % These are what the RF waveform, the slice profile and the T1 assumption
-    % rest on, so a difference invalidates the table even when the name matches.
-    extra = {'MagneticFieldStrength', 'SliceThickness', 'RFPulseType'};
+    core  = {'ProtocolName', 'SoftwareVersions', 'PulseSequenceDetails'};
+    % Fields checked whenever both sides carry them. SequenceName is here rather
+    % than in core because syngo XA does not export it, so a LUT built from XA
+    % data cannot carry it. The others, recorded since 2026-09-11, are what the RF
+    % waveform, the slice profile and the T1 assumption rest on, so a difference
+    % invalidates the table even when the name matches.
+    extra = {'SequenceName', 'MagneticFieldStrength', 'SliceThickness', 'RFPulseType', 'RFPulseTypeCode'};
+    % RFPulseType (printout label, e.g. 'Low SAR') and RFPulseTypeCode (DICOM number,
+    % e.g. 4) record the same fact in two vocabularies. Each is compared only with
+    % itself - never label against code - and one of them matching verifies the pulse.
+    rf_pair = {'RFPulseType', 'RFPulseTypeCode'};
 
     % Relative tolerance for the numeric fields; everything else is compared exactly.
     tol = struct( ...
@@ -70,6 +88,18 @@ function report = check_LUT_compatibility(LUT, acq)
         matched{end+1} = name; %#ok<AGROW>
     end
 
+    if any(ismember(rf_pair, matched))
+        unverified = setdiff(unverified, rf_pair, 'stable');
+    end
+
+    % Echo train: the LUT simulates echoes at esp, 2*esp, ..., etl*esp.
+    for name = {'EchoTrainLength', 'EchoTime'}
+        switch compare_echoes(LUT, acq, name{1})
+            case 'matched',    matched{end+1}    = name{1}; %#ok<AGROW>
+            case 'unverified', unverified{end+1} = name{1}; %#ok<AGROW>
+        end
+    end
+
     if ~any(strcmp(matched, 'ProtocolName'))
         error('check_LUT_compatibility:NoProtocolName', ...
             'The acquisition carries no ProtocolName, so there is nothing to match the LUT against.');
@@ -83,6 +113,69 @@ function report = check_LUT_compatibility(LUT, acq)
     end
 
     report = struct('Matched', {matched}, 'Unverified', {unverified});
+end
+
+function acq = resolve_acquisition(acq, series)
+    % Turn a JSON path or a DICOM folder into the acquisition struct.
+    if isstring(acq) && isscalar(acq), acq = char(acq); end
+    if isstruct(acq)
+        assert(isscalar(acq), 'check_LUT_compatibility:BadAcquisition', ...
+            'The acquisition struct must be a single struct, not an array.');
+        assert(isempty(series), 'check_LUT_compatibility:SeriesWithoutDICOM', ...
+            'SeriesNumber only applies when the acquisition is a DICOM folder.');
+        return
+    end
+    if ~ischar(acq)
+        error('check_LUT_compatibility:BadAcquisition', ...
+            'The acquisition must be a struct, a JSON file path or a DICOM folder.');
+    end
+    if isfolder(acq)
+        acq = acquisition_json_from_DICOM(acq, 'SeriesNumber', series, 'verbose', false);
+    elseif isfile(acq) && endsWith(acq, '.json', 'IgnoreCase', true)
+        assert(isempty(series), 'check_LUT_compatibility:SeriesWithoutDICOM', ...
+            'SeriesNumber only applies when the acquisition is a DICOM folder.');
+        acq = jsondecode(fileread(acq));
+    else
+        error('check_LUT_compatibility:BadAcquisition', ...
+            '"%s" is neither a JSON file nor a folder of DICOM files.', acq);
+    end
+end
+
+function status = compare_echoes(LUT, acq, name)
+    % 'matched' or 'unverified'; errors on a mismatch. Echo times in seconds,
+    % compared to within 1 microsecond - the resolution of the Siemens protocol.
+    status = 'unverified';
+    tol = 1e-6;
+    switch name
+        case 'EchoTrainLength'
+            if ~isfield(LUT, 'EchoTrainLength') || ~isfield(acq, 'EchoTrainLength'), return, end
+            a = LUT.EchoTrainLength;  b = double(acq.EchoTrainLength);
+            if ~isscalar(b) || a ~= b
+                error('check_LUT_compatibility:ProtocolMismatch', ...
+                    ['EchoTrainLength differs between the LUT and the acquisition:\n' ...
+                     '    LUT         : %d\n    acquisition : %s\n' ...
+                     'This LUT was built for a different protocol and must not be applied here.'], ...
+                    a, mat2str(b));
+            end
+        case 'EchoTime'
+            if ~isfield(LUT, 'EchoSpacing_s') || ~isfield(LUT, 'EchoTrainLength') ...
+                    || ~isfield(acq, 'EchoTime') || numel(acq.EchoTime) < 2
+                return    % a single TE (one echo image, or none) says nothing about the train
+            end
+            TE = double(acq.EchoTime(:));
+            if max(TE) > 1, TE = TE * 1e-3; end     % ms -> s, as build_opt_from_protocol does
+            expected = (1:LUT.EchoTrainLength).' * LUT.EchoSpacing_s;
+            if numel(TE) ~= numel(expected) || any(abs(TE - expected) > tol)
+                error('check_LUT_compatibility:ProtocolMismatch', ...
+                    ['EchoTime differs between the LUT and the acquisition:\n' ...
+                     '    LUT         : %d echoes, %.4g ms spacing (first at %.4g ms)\n' ...
+                     '    acquisition : %d echoes, %.4g ms spacing (first at %.4g ms)\n' ...
+                     'This LUT was built for a different protocol and must not be applied here.'], ...
+                    numel(expected), LUT.EchoSpacing_s*1e3, expected(1)*1e3, ...
+                    numel(TE), (TE(2)-TE(1))*1e3, TE(1)*1e3);
+            end
+    end
+    status = 'matched';
 end
 
 function [v, found] = acq_value(acq, name)

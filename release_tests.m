@@ -258,7 +258,8 @@ fprintf('\ncheck_LUT_compatibility\n');
 % The acquisition side is written out here rather than read from the LUT, so
 % this compares against known values instead of the file against itself.
 % RFPulseType sits in the printout block, which is where the PDF tool puts it
-% and where a plain dcm2niix sidecar has nothing at all.
+% and where a plain dcm2niix sidecar has nothing at all. The echo train is the
+% full list, as the PDF and DICOM tools write it: 16 echoes at 11.1 ms.
 acq = struct( ...
     'ProtocolName',          'T2MAP_adapted_from_GRAPPATINI', ...
     'SequenceName',          'WIP_se2d16', ...
@@ -266,17 +267,24 @@ acq = struct( ...
     'PulseSequenceDetails',  '%CustomerSeq%\accT2map_wip899c', ...
     'MagneticFieldStrength', 3, ...
     'SliceThickness',        2, ...
+    'EchoTrainLength',       16, ...
+    'EchoTime',              (1:16).' * 0.0111, ...
     'SiemensProtocolPrintout', struct('RFPulseType', 'Low SAR'));
 
 rep = check_LUT_compatibility(G, acq);
-check(numel(rep.Matched) == 7 && isempty(rep.Unverified), 'the shipped LUT matches all seven identity fields');
+check(numel(rep.Matched) == 9 && isempty(rep.Unverified), ...
+    'the shipped LUT matches all seven identity fields and the echo train');
 
+% The echo times are the run-01 / run-02 case: everything else identical,
+% only the spacing differs - 13.3 ms against the table's 11.1 ms.
 wrongs = { 'ProtocolName',          'T2MAP_something_else'
            'SequenceName',          'WIP_se2d32'
            'SoftwareVersions',      'syngo MR XA30'
            'PulseSequenceDetails',  '%CustomerSeq%\accT2map_wip900d'
            'MagneticFieldStrength', 1.5
-           'SliceThickness',        3 };
+           'SliceThickness',        3
+           'EchoTrainLength',       12
+           'EchoTime',              (1:16).' * 0.0133 };
 for k = 1:size(wrongs,1)
     bad = acq;  bad.(wrongs{k,1}) = wrongs{k,2};
     check_error(@() check_LUT_compatibility(G, bad), 'check_LUT_compatibility:ProtocolMismatch', ...
@@ -295,12 +303,52 @@ try
 catch
     accepted = false;      % a mismatch here is the failure this check is about
 end
-check(accepted && numel(repNear.Matched) == 7, '2.89362 T and 3 T count as the same field strength');
+check(accepted && numel(repNear.Matched) == 9, '2.89362 T and 3 T count as the same field strength');
 
 % A hand-written sidecar may put RFPulseType at the top level instead.
 flat = rmfield(acq, 'SiemensProtocolPrintout');  flat.RFPulseType = 'Low SAR';
 repFlat = check_LUT_compatibility_quietly(G, flat);
-check(numel(repFlat.Matched) == 7, 'RFPulseType is found at the top level too');
+check(numel(repFlat.Matched) == 9, 'RFPulseType is found at the top level too');
+
+% The DICOM route records the pulse type as the scanner's code (RFPulseTypeCode),
+% never as the label. A code is compared with a code only.
+Gc = G;  Gc.Protocol = rmfield(G.Protocol, 'RFPulseType');  Gc.Protocol.RFPulseTypeCode = 4;
+coded = rmfield(acq, 'SiemensProtocolPrintout');  coded.RFPulseTypeCode = 4;
+repCode = check_LUT_compatibility_quietly(Gc, coded);
+check(numel(repCode.Matched) == 9 && isempty(repCode.Unverified), ...
+    'a LUT with RFPulseTypeCode matches an acquisition with the same code');
+coded.RFPulseTypeCode = 2;
+check_error(@() check_LUT_compatibility(Gc, coded), 'check_LUT_compatibility:ProtocolMismatch', ...
+    'a different RFPulseTypeCode is refused');
+repMixed = check_LUT_compatibility_quietly(Gc, acq);    % LUT has the code, acquisition the label
+check(isequal(repMixed.Unverified, {'RFPulseType','RFPulseTypeCode'}), ...
+    'a label is never compared with a code - both are reported unverified');
+
+% Echo train. A dcm2niix sidecar of a GRAPPATINI map has no EchoTime at all, and a
+% single-echo image has one TE: neither says anything about the train.
+noTE = rmfield(acq, 'EchoTime');
+repNoTE = check_LUT_compatibility_quietly(G, noTE);
+check(isequal(repNoTE.Unverified, {'EchoTime'}), 'without echo times, the echo train is reported unverified');
+oneTE = acq;  oneTE.EchoTime = 0.08;
+repOneTE = check_LUT_compatibility_quietly(G, oneTE);
+check(isequal(repOneTE.Unverified, {'EchoTime'}), 'a single TE is not mistaken for a train');
+inMs = acq;  inMs.EchoTime = acq.EchoTime * 1000;
+repMs = check_LUT_compatibility_quietly(G, inMs);
+check(numel(repMs.Matched) == 9, 'echo times written in ms are read as ms');
+shifted = acq;  shifted.EchoTime = acq.EchoTime + 0.002;
+check_error(@() check_LUT_compatibility(G, shifted), 'check_LUT_compatibility:ProtocolMismatch', ...
+    'the right spacing with the first echo offset is refused - the simulation puts it at one spacing');
+
+% The acquisition may be given as a JSON file instead of a struct.
+jf = [tempname '.json'];
+fid = fopen(jf, 'w');  fprintf(fid, '%s', jsonencode(acq));  fclose(fid);
+repFile = check_LUT_compatibility(G, jf);
+delete(jf);
+check(numel(repFile.Matched) == 9, 'a JSON file path is read like the struct it contains');
+check_error(@() check_LUT_compatibility(G, 'no_such_file.json'), 'check_LUT_compatibility:BadAcquisition', ...
+    'a path that is neither a JSON file nor a folder is refused');
+check_error(@() check_LUT_compatibility(G, acq, 'SeriesNumber', 7), 'check_LUT_compatibility:SeriesWithoutDICOM', ...
+    'SeriesNumber with a struct is refused rather than ignored');
 
 check_error(@() check_LUT_compatibility(G, rmfield(acq,'ProtocolName')), 'check_LUT_compatibility:NoProtocolName', ...
     'an acquisition with no ProtocolName cannot be matched');
@@ -315,8 +363,65 @@ thin = rmfield(acq, {'SequenceName','SoftwareVersions','SiemensProtocolPrintout'
 check_warning(@() check_LUT_compatibility(G, thin), 'check_LUT_compatibility:Unverified', ...
     'a sidecar missing identity fields warns rather than passing silently');
 repThin = check_LUT_compatibility_quietly(G, thin);
-check(isequal(repThin.Unverified, {'SequenceName','SoftwareVersions','RFPulseType'}), ...
+check(isequal(repThin.Unverified, {'SoftwareVersions','SequenceName','RFPulseType','RFPulseTypeCode'}), ...
     'and names the fields it could not check');
+
+% syngo XA exports no SequenceName, so a LUT built from XA data has none: that LUT
+% must still be checkable, with SequenceName reported unverified.
+Gxa = G;  Gxa.Protocol = rmfield(G.Protocol, 'SequenceName');
+repXa = check_LUT_compatibility_quietly(Gxa, acq);
+check(numel(repXa.Matched) == 8 && isequal(repXa.Unverified, {'SequenceName'}), ...
+    'a LUT without SequenceName (syngo XA) is checked on everything else');
+
+%% ------------------------------------------------------------------ %%
+%  Siemens DICOM protocol reader - base MATLAB only
+%% ------------------------------------------------------------------ %%
+fprintf('\nread_siemens_ascconv / siemens_protocol_facts\n');
+
+% A synthetic protocol block between binary bytes, as it sits inside a DICOM file.
+% Three real echoes followed by leftover template values: on the 2026-10-12 XA61
+% phantom, lContrasts = 16 and alTE[16..31] = 1700..3200 us are not echoes.
+asc = {
+    'tSequenceFileName	 = 	""%CustomerSeq%\wip_899_AccT2_se_mc""'
+    'lContrasts	 = 	3'
+    'alTR[0]	 = 	5040000'
+    'alTE[0]	 = 	10100'
+    'alTE[1]	 = 	20200'
+    'alTE[2]	 = 	30300'
+    'alTE[3]	 = 	1700'
+    'alTE[4]	 = 	1800'
+    'adFlipAngleDegree[0]	 = 	180.0'
+    'sSliceArray.asSlice[0].dThickness	 = 	4.0'
+    'sTXSPEC.ucRFPulseType	 = 	4'
+    };
+fixture = [tempname '.dcm'];
+fid = fopen(fixture, 'w');
+fwrite(fid, uint8([0 1 2 255]));
+fwrite(fid, uint8(['### ASCCONV BEGIN object=MrProtDataImpl@MrProtocolData ###' newline ...
+                   strjoin(asc, newline) newline '### ASCCONV END ###']));
+fwrite(fid, uint8([0 0 7]));
+fclose(fid);
+[P, found] = read_siemens_ascconv(fixture);
+delete(fixture);
+
+check(found && strcmp(P('alTE[1]'), '20200'), 'the block is found among binary bytes and read as text');
+check(strcmp(P('sSliceArray.asSlice[0].dThickness'), '4.0'), 'dotted and indexed names are kept whole');
+
+facts = siemens_protocol_facts(P);
+check(isequal(facts.EchoTime, [0.0101; 0.0202; 0.0303]), ...
+    'only the first lContrasts alTE values are echoes, converted us -> s');
+check(facts.EchoTrainLength == 3 && facts.RepetitionTime == 5.04, 'echo count from lContrasts, TR us -> s');
+check(facts.FlipAngle == 180 && facts.SliceThickness == 4, 'flip angle and slice thickness');
+check(strcmp(facts.PulseSequenceDetails, '%CustomerSeq%\wip_899_AccT2_se_mc'), ...
+    'the sequence path loses its doubled quotes');
+check(facts.RFPulseTypeCode == 4, 'the RF pulse type is kept as the scanner code');
+
+noEcho = containers.Map(P.keys, P.values);  remove(noEcho, 'lContrasts');
+check_error(@() siemens_protocol_facts(noEcho), 'siemens_protocol_facts:MissingParameter', ...
+    'a protocol without lContrasts is refused, not read as "all alTE values"');
+past = containers.Map(P.keys, P.values);  past('lContrasts') = '5';
+check_error(@() siemens_protocol_facts(past), 'siemens_protocol_facts:EchoesNotIncreasing', ...
+    'reading past the real echoes into the template values is caught');
 
 %% ------------------------------------------------------------------ %%
 %  Worked example - the shipped table, end to end

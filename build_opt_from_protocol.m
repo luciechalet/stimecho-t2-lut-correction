@@ -119,6 +119,12 @@ function opt=build_opt_from_protocol(acq_json_path, pulse_json_path, RF_exc_path
     elseif isfield(AcqParams, 'RFPulseType')
         opt.protocol.RFPulseType = AcqParams.RFPulseType;
     end
+    % The same fact as the scanner's number, as acquisition_json_from_DICOM.m reads it
+    % from the DICOM (sTXSPEC.ucRFPulseType). Kept apart from the label: the DICOM does
+    % not name the pulse type, and the label-to-code mapping is not confirmed.
+    if isfield(AcqParams, 'RFPulseTypeCode')
+        opt.protocol.RFPulseTypeCode = AcqParams.RFPulseTypeCode;
+    end
 
     % Set T1 value or function of T2
     if isa(args.T1,'function_handle')

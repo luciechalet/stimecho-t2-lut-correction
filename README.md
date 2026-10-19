@@ -275,6 +275,12 @@ check_LUT_compatibility(LUT, acq);   % errors on a mismatch, warns on fields the
 
 If the fields do not match, the table has to be rebuilt for your own protocol with `build_T2_LUT`, which needs StimFit and the vendor RF waveform files for that sequence (see Inputs).
 
+Alternatively, compatibility between LUT and dataset can be assessed directly from DICOM or JSON sidecar: 
+```matlab
+check_LUT_compatibility(LUT, 'sub-01_T2map.json')                       % a JSON file
+check_LUT_compatibility(LUT, '../test_data/.../DICOM', 'SeriesNumber', 15)  % a DICOM folder
+```
+
 ## Applying the LUT
 The toolbox provides an `apply_T2_LUT` function which takes an apparent T2 array (e.g. GRAPPATINI T2 map), the LUT structure previously built, and an optional mask; and returns a LUT corrected T2 array of the same dimension. Voxels outside the provided mask, and voxels outside of the LUT range are set to NaN. Info provides proportions of voxels below, within, and above the provided LUT range.
 

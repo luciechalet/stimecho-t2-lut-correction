@@ -63,6 +63,39 @@ check(isequal(back.EchoTime, acq.EchoTime) && back.RFPulseTypeCode == 4 ...
       && strcmp(back.PulseSequenceDetails, acq.PulseSequenceDetails), ...
       'the written JSON reads back unchanged');
 
+%% ------------------------------------------------------------------ %%
+%  check_LUT_compatibility with a DICOM folder
+%% ------------------------------------------------------------------ %%
+fprintf('\ncheck_LUT_compatibility (DICOM input)\n');
+
+% Stand-in for a run-02 LUT: the protocol identity and echo train a LUT built from
+% series 15 would record. Building a real one needs StimFit and proprietary/, and
+% check_LUT_compatibility only reads these fields.
+a15  = acquisition_json_from_DICOM(dcm, 'SeriesNumber', 15, 'verbose', false);
+keep = {'ProtocolName', 'SoftwareVersions', 'PulseSequenceDetails', 'MagneticFieldStrength', ...
+        'SliceThickness', 'RFPulseTypeCode'};
+LUT02 = struct('Protocol', struct(), 'EchoSpacing_s', 0.0101, 'EchoTrainLength', 16);
+for k = 1:numel(keep), LUT02.Protocol.(keep{k}) = a15.(keep{k}); end
+
+rep = check_LUT_compatibility_quietly(LUT02, dcm, 'SeriesNumber', 15);
+check(all(ismember({'EchoTime', 'EchoTrainLength', 'RFPulseTypeCode'}, rep.Matched)) ...
+      && isequal(rep.Unverified, {'SequenceName'}), ...
+      'a run-02 LUT matches series 15, echo train included (only SequenceName unverified, XA61)');
+
+check_error(@() check_LUT_compatibility_quietly(LUT02, dcm, 'SeriesNumber', 7), ...
+    'check_LUT_compatibility:ProtocolMismatch', ...
+    'the same LUT on series 7 is refused: identical protocol, 13.3 ms against 10.1 ms');
+
+% The trap the DICOM input closes: the run-01 dcm2niix sidecar has no echo times,
+% so the wrong-run LUT passes on it - with EchoTime reported unverified.
+side01 = fullfile(anat, 'sub-phantom_ses-20261012_acq-GRAPPATINI_run-01_T2map.json');
+rep = check_LUT_compatibility_quietly(LUT02, side01);
+check(ismember('EchoTime', rep.Unverified), ...
+    'from the run-01 sidecar the mismatch cannot be seen, and EchoTime is reported unverified');
+
+check_error(@() check_LUT_compatibility_quietly(LUT02, dcm), ...
+    'acquisition_json_from_DICOM:WhichSeries', 'a DICOM folder without SeriesNumber refuses to guess');
+
 fprintf('\nphantom_tests: all checks passed\n\n');
 
 %% ------------------------------------------------------------------ %%
@@ -85,6 +118,13 @@ function check_error(f, expected_id, name)
         got = ME.identifier;
     end
     check(strcmp(got, expected_id), sprintf('%s [%s]', name, expected_id));
+end
+
+function r = check_LUT_compatibility_quietly(varargin)
+    % The Unverified warning is expected here; only the report is checked.
+    orig = warning('off', 'check_LUT_compatibility:Unverified');
+    restore = onCleanup(@() warning(orig)); %#ok<NASGU>
+    r = check_LUT_compatibility(varargin{:});
 end
 
 function s = list_if_any(c)
