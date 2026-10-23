@@ -599,6 +599,9 @@
   "FitMethod": "nls",
   "SkipEcho": 1,
   "T1_s": 1.33,
+  "ApparentT2Dims": [
+    "TrueT2"
+  ],
   "B1": 1,
   "EchoSpacing_s": 0.0111,
   "EchoTrainLength": 16,
@@ -611,15 +614,15 @@
     "stimecho_t2_lut_correction": {
       "Remote": "https://github.com/luciechalet/stimecho-t2-lut-correction",
       "Branch": "master",
-      "Commit": "9e04561",
+      "Commit": "e5325c7",
       "Dirty": false
     },
     "StimFit": {
       "Remote": "https://github.com/luciechalet/StimFit",
-      "Branch": "fix/complex-tip-angle",
-      "Commit": "95759c8",
+      "Branch": "Integration",
+      "Commit": "0862319",
       "Dirty": false
     }
   },
-  "Timestamp": "2026-09-11T12:58:45"
+  "Timestamp": "2026-10-23T12:18:47"
 }
