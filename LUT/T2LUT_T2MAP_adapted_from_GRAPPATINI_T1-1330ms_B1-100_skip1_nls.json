@@ -614,8 +614,8 @@
     "stimecho_t2_lut_correction": {
       "Remote": "https://github.com/luciechalet/stimecho-t2-lut-correction",
       "Branch": "master",
-      "Commit": "e5325c7",
-      "Dirty": false
+      "Commit": "14ec9ae",
+      "Dirty": true
     },
     "StimFit": {
       "Remote": "https://github.com/luciechalet/StimFit",
@@ -624,5 +624,5 @@
       "Dirty": false
     }
   },
-  "Timestamp": "2026-10-23T12:18:47"
+  "Timestamp": "2026-10-23T16:29:25"
 }
