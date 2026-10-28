@@ -1,4 +1,4 @@
-[![DOI](https://zenodo.org/badge/1317389789.svg)](https://doi.org/10.5281/zenodo.23727484)
+[![DOI](https://zenodo.org/badge/1317389789.svg)](https://doi.org/10.5281/zenodo.23727484) [![GitHub release](https://img.shields.io/github/v/release/luciechalet/stimecho-t2-lut-correction)](https://github.com/luciechalet/stimecho-t2-lut-correction/releases/latest)
 
 # Stimulated-echo T2 LUT correction
 
