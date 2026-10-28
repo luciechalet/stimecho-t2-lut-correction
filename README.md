@@ -1,4 +1,5 @@
-[![DOI](https://zenodo.org/badge/1317389789.svg)](https://doi.org/10.5281/zenodo.23727484) [![GitHub release](https://img.shields.io/github/v/release/luciechalet/stimecho-t2-lut-correction)](https://github.com/luciechalet/stimecho-t2-lut-correction/releases/latest)
+[![DOI](https://zenodo.org/badge/1317389789.svg)](https://doi.org/10.5281/zenodo.23727484) [![GitHub release](https://img.shields.io/github/v/release/luciechalet/stimecho-t2-lut-correction)](https://github.com/luciechalet/stimecho-t2-lut-correction/releases/latest) [![tests](https://github.com/luciechalet/stimecho-t2-lut-correction/actions/workflows/tests.yml/badge.svg)](https://github.com/luciechalet/stimecho-t2-lut-correction/actions/workflows/tests.yml)
+
 
 # Stimulated-echo T2 LUT correction
 
@@ -306,6 +307,8 @@ This toolbox does not provide code for loading T2 maps or saving the output file
 ```matlab
 release_tests
 ```
+
+Runs automatically on every push with MATLAB R2025a and the latest release (GitHub Actions).
 
 ## Note on assumptions
 - *B1 (transmit inhomogeneity), optional axis:* By default the LUT assumes B1 = 1, its nominal value, meaning the pulses are assumed to deliver exactly the flip angles the protocol prescribes. Nominal is not a maximum: the delivered angle sits above 1 in some regions and below 1 in others. Within the 30-130 ms band the bias is systematic and positive below 1 (corrected T2 remains overestimated where B1<1). Simulations indicate an error on the inferred T2 of about +1 to +3 ms for a typical B1 of 0.85, rising to +2 to +5 ms at B1 = 0.80 and +6 to +16 ms in regions where B1 falls to 0.65. The error increases with T2. Conversely, over the 30-130 ms band, B1 = 1.05 or 1.10 costs at most 0.4 ms, and B1 = 1.30 stays under 3 ms (corrected T2 is underestimated where B1>1). This represents the largest source of uncertainty for T2 > 50 ms. Note that at the bottom of the simulated range the sign reverses: at true T2 = 10 ms and B1 = 0.8 the apparent T2 is 9.0 ms.
