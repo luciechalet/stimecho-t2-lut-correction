@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/1317389789.svg)](https://doi.org/10.5281/zenodo.23727484)
+
 # Stimulated-echo T2 LUT correction
 
 This toolbox creates a Look-Up-Table based on sequence parameters and slice profile using EPG simulations for a range of plausible T2 values in the human brain at 3T. 
