@@ -1,0 +1,33 @@
+# Runs release_tests on GitHub's servers at every push and pull request.
+# build_opt_from_protocol / build_T2_LUT are not tested here: they need StimFit
+# and the vendor RF waveforms, which are not distributed.
+name: tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:        # adds a "Run workflow" button in the Actions tab
+
+jobs:
+  release-tests:
+    name: release_tests (${{ matrix.release }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false      # one release failing does not cancel the other
+      matrix:
+        release: [R2025a, latest]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up MATLAB
+        uses: matlab-actions/setup-matlab@v3
+        with:
+          release: ${{ matrix.release }}
+          products: Optimization_Toolbox
+          cache: true
+
+      - name: Run release_tests
+        uses: matlab-actions/run-command@v3
+        with:
+          command: release_tests
