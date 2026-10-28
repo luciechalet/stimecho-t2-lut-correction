@@ -9,11 +9,11 @@ authors:
   - family-names: Chalet
     given-names: Lucie
     affiliation: "University G. d'Annunzio of Chieti-Pescara"
-    # orcid: "https://orcid.org/0000-0000-0000-0000"
+    orcid: "https://orcid.org/0000-0002-8783-984X"
 doi: 10.5281/zenodo.23727484
 repository-code: "https://github.com/luciechalet/stimecho-t2-lut-correction"
 license: MIT
-version: v1.0.0
+version: v1.0.1
 date-released: 2026-10-28
 keywords:
   - MRI
