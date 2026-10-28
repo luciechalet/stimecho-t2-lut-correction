@@ -1,0 +1,24 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata below."
+title: "stimecho-t2-lut-correction"
+abstract: >-
+  EPG-based look-up-table correction of stimulated-echo bias in
+  GRAPPATINI T2 maps, built from the sequence protocol and RF slice profiles.
+type: software
+authors:
+  - family-names: Chalet
+    given-names: Lucie
+    affiliation: "University G. d'Annunzio of Chieti-Pescara"
+    # orcid: "https://orcid.org/0000-0000-0000-0000"
+doi: 10.5281/zenodo.23727484
+repository-code: "https://github.com/luciechalet/stimecho-t2-lut-correction"
+license: MIT
+version: v1.0.0
+date-released: 2026-10-28
+keywords:
+  - MRI
+  - T2 mapping
+  - GRAPPATINI
+  - stimulated echoes
+  - extended phase graph
+  - MATLAB
