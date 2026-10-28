@@ -1,15 +1,9 @@
-% RELEASE_TESTS  Public test tier for stimecho-t2-lut-correction (decision D12).
+% RELEASE_TESTS  Public test tier for stimecho-t2-lut-correction 
 %
 %   Run from the repository root:   matlab -batch release_tests
 %
 %   Covers everything that runs without proprietary data: apply_T2_LUT,
 %   fit_monoexp, parse_skipEcho, and the LUT files shipped under LUT/.
-%   build_T2_LUT / build_opt_from_protocol need StimFit and the vendor RF
-%   waveforms, so they cannot be tested here at all - their regression baseline
-%   is checkpoint_step4.m, which needs proprietary/.
-%
-%   Fails loudly on the first broken check and returns a nonzero exit code, so
-%   it can be used as a CI step once the repository is public.
 
 fprintf('\nrelease_tests: %s\n\n', datetime('now','Format','yyyy-MM-dd HH:mm:ss'));
 
@@ -24,11 +18,6 @@ check(isequal(parse_skipEcho('1'),    1), 'single index as text');
 check(isequal(parse_skipEcho(1),      1), 'single index as number');
 check(isequal(parse_skipEcho(' 1 , 3 '), [1 3]), 'list, with whitespace');
 check(isequal(parse_skipEcho([1 3]), [1 3]), 'list as numeric vector');
-
-% Regression: str2double('1,3') returns 13, not NaN, because MATLAB reads the
-% comma as a thousands separator. The version this was lifted from tested
-% str2double before splitting, so '1,3' silently skipped echo 13 - or nothing
-% at all when the train was shorter. Keep this check.
 check(~isequal(parse_skipEcho('1,3'), 13), 'comma is a separator, not a thousands mark');
 
 check_error(@() parse_skipEcho('0'),   'parse_skipEcho:BadSpec', 'echo 0 rejected (indices are 1-based)');
@@ -46,22 +35,14 @@ T2_true = 80;  S0_true = 120;
 S_pure  = S0_true * exp(-TE_ms/T2_true);
 
 % Both fitters minimise different objectives and agree only on a perfectly
-% monoexponential curve - which makes this one input a test of both at once.
+% monoexponential curve
 [t2_nls, s0_nls] = fit_monoexp(S_pure, TE_ms, 'method', 'nls');
 [t2_log, s0_log] = fit_monoexp(S_pure, TE_ms, 'method', 'loglinear');
 check(abs(t2_nls - T2_true) < 1e-6,  sprintf('nls recovers a pure exponential (%.10f ms)', t2_nls));
 check(abs(t2_log - T2_true) < 1e-9,  sprintf('loglinear recovers it in closed form (%.12f ms)', t2_log));
 check(abs(s0_nls - S0_true) < 1e-5 && abs(s0_log - S0_true) < 1e-8, 'both recover S0');
 
-% Unit-agnostic: T2 comes back in whatever units TE was given in. This holds
-% only because TolX is set tight enough that the relative TolFun governs -
-% lsqnonlin's TolX is an ABSOLUTE step tolerance, so StimFit's TolX = 5e-4,
-% chosen for T2 in seconds, drifts here (measured: 3e-3 ms on this curve).
-% Two properties of the input are needed for that to show up at all, and both
-% are deliberate: a bi-exponential, because on a perfect exponential the log-
-% linear starting guess is already the answer and the solver never iterates;
-% and FSEsig's amplitude of ~0.2, because with an amplitude of ~100 the step
-% norm is dominated by A and no T2 tolerance can bite.
+% Unit-agnostic: T2 comes back in whatever units TE was given in.
 S_bi   = 0.2*(0.8*exp(-TE_ms/70) + 0.2*exp(-TE_ms/40));
 t2_bi  = fit_monoexp(S_bi, TE_ms,      'method', 'nls');
 t2_bis = fit_monoexp(S_bi, TE_ms/1000, 'method', 'nls');
@@ -89,20 +70,18 @@ check_error(@() fit_monoexp(S_pure(1:4), TE_ms(1:4), 'skipEcho', [1 3]), 'fit_mo
 fprintf('\napply_T2_LUT\n');
 
 % Synthetic table: a smooth monotone stand-in, so these checks test the code
-% and not the contents of any particular LUT. The shipped LUT gets its own
-% section below.
+% and not the contents of any particular LUT.
 LUT = synthetic_LUT();
 appAxis = LUT.ApparentT2(:);
 trueAxis= LUT.TrueT2(:);
 
 % Round trip: feeding the table its own apparent axis must return its own true
-% axis. This is the check that the inversion is the right way round - swapping
-% the two interp1 arguments runs cleanly and moves T2 the wrong way.
+% axis.
 back = apply_T2_LUT(appAxis, LUT);
 check(max(abs(back - trueAxis)) < 1e-9, sprintf('round trip through the table (max %.2e ms)', max(abs(back - trueAxis))));
 check(all(back < appAxis), 'the correction moves T2 DOWN (apparent > true)');
 
-% Out of range is NaN at both ends: no clipping, no extrapolation (D8).
+% Out of range is NaN at both ends: no clipping, no extrapolation.
 edge = [appAxis(1) - 1e-6; appAxis(end) + 1e-6; 0.1; 1e4];
 check(all(isnan(apply_T2_LUT(edge, LUT))), 'out-of-range voxels become NaN, not clipped');
 
@@ -226,16 +205,14 @@ for f = files.'
     check(a(end) < 409.5, sprintf('%s: apparent max %.2f ms stays below the 409.5 ms int16 ceiling', tag, a(end)));
 end
 
-% Probe values for the table the repository ships. Hardcoded here rather than
-% recomputed: recomputing would need StimFit and proprietary/, and reading them
-% back out of the same file would only compare the file to itself.
+% Probe values for the table the repository ships. 
 shipped = 'T2LUT_T2MAP_adapted_from_GRAPPATINI_T1-1330ms_B1-100_skip1_nls.json';
 check(isfile(fullfile(here,'LUT',shipped)), 'the GRAPPATINI table is the one that ships');
 G = jsondecode(fileread(fullfile(here,'LUT',shipped)));
 
 check(strcmp(G.FitMethod,'nls') && isequal(G.SkipEcho,1) && G.B1 == 1 && abs(G.T1_s - 1.33) < 1e-12, ...
-      'built with nls, echo 1 skipped, B1 = 1, T1 = 1.33 s (D1, D3, D5)');
-check(isequal(G.TrueT2(:).', 10:1:300), 'grid is 10:1:300 ms, 291 points (D2)');
+      'built with nls, echo 1 skipped, B1 = 1, T1 = 1.33 s');
+check(isequal(G.TrueT2(:).', 10:1:300), 'grid is 10:1:300 ms, 291 points');
 
 probes = [ 30  32.8350
            80  85.8161
@@ -255,11 +232,6 @@ check(abs(min(slope) - 1.0261) < 5e-4, sprintf('min local slope %.4f - above 1, 
 %% ------------------------------------------------------------------ %%
 fprintf('\ncheck_LUT_compatibility\n');
 
-% The acquisition side is written out here rather than read from the LUT, so
-% this compares against known values instead of the file against itself.
-% RFPulseType sits in the printout block, which is where the PDF tool puts it
-% and where a plain dcm2niix sidecar has nothing at all. The echo train is the
-% full list, as the PDF and DICOM tools write it: 16 echoes at 11.1 ms.
 acq = struct( ...
     'ProtocolName',          'T2MAP_adapted_from_GRAPPATINI', ...
     'SequenceName',          'WIP_se2d16', ...
@@ -379,8 +351,6 @@ check(numel(repXa.Matched) == 8 && isequal(repXa.Unverified, {'SequenceName'}), 
 fprintf('\nread_siemens_ascconv / siemens_protocol_facts\n');
 
 % A synthetic protocol block between binary bytes, as it sits inside a DICOM file.
-% Three real echoes followed by leftover template values: on the 2026-10-12 XA61
-% phantom, lContrasts = 16 and alTE[16..31] = 1700..3200 us are not echoes.
 asc = {
     'tSequenceFileName	 = 	""%CustomerSeq%\wip_899_AccT2_se_mc""'
     'lContrasts	 = 	3'
@@ -512,9 +482,7 @@ function r = check_LUT_compatibility_quietly(varargin)
 end
 
 function check_error(f, expected_id, name)
-    % Assert on the error identifier, never on a count of the word "error":
-    % a count is satisfied by any guard firing, so the check stays green after
-    % the specific guard it is named for is deleted.
+    % Assert on the error identifier
     got = '(no error raised)';
     try
         f();

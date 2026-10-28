@@ -152,8 +152,7 @@ end
 function sn = series_number_from_bytes(c)
     % Series Number (0020,0011), VR IS, in explicit VR little endian: the tag bytes
     % 20 00 11 00, then 'IS', a 2-byte length and the number as text. The first match
-    % is the top-level element - checked against pydicom on all 78 files of the
-    % 2026-10-12 phantom. NaN if absent (e.g. implicit VR files).
+    % is the top-level element. NaN if absent (e.g. implicit VR files).
     sn = NaN;
     k = strfind(c, [char([32 0 17 0]) 'IS']);
     if isempty(k)

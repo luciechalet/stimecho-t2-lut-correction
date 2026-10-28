@@ -7,7 +7,7 @@ This toolbox was developed to correct for T2 maps reconstructed with the GRAPPAT
 
 **Note on assumptions**: 
 - *B1 (transmit inhomogeneity), optional axis:* By default the LUT assumes B1 = 1, its nominal value, meaning the pulses are assumed to deliver exactly the flip angles the protocol prescribes. Nominal is not a maximum: the delivered angle sits above 1 in some regions and below 1 in others. Within the 30-130 ms band the bias is systematic and positive below 1 (corrected T2 remains overestimated where B1<1). Simulations indicate an error on the inferred T2 of about +1 to +3 ms for a typical B1 of 0.85, rising to +2 to +5 ms at B1 = 0.80 and +6 to +16 ms in regions where B1 falls to 0.65. The error increases with T2. Conversely, over the 30-130 ms band, B1 = 1.05 or 1.10 costs at most 0.4 ms, and B1 = 1.30 stays under 3 ms (corrected T2 is underestimated where B1>1). This represents the largest source of uncertainty for T2 > 50 ms. Note that at the bottom of the simulated range the sign reverses: at true T2 = 10 ms and B1 = 0.8 the apparent T2 is 9.0 ms.
-If a B1 map was acquired in the same session as the T2 map, the LUT can optionally be built over a B1 grid and the map passed to `apply_T2_LUT`. The result then depends on the accuracy of the B1 map, and on whether the map and the simulation describe the same flip angle: the map measures the transmit field, while the simulated flip angle also depends on the modelled slice profile (see the accompanying paper). 
+If a B1 map was acquired in the same session as the T2 map, the LUT can optionally be built over a B1 grid and the map passed to `apply_T2_LUT`. The result then depends on the accuracy of the B1 map, and on whether the map and the simulation describe the same flip angle: the map measures the transmit field, while the simulated flip angle also depends on the modelled slice profile. 
 Note also that StimFit fits a single flip-angle scaling, so its "B1" absorbs simulated-slice-profile and gradient-calibration error alongside true transmit inhomogeneity. A value fitted that way describes the acquisition it came from rather than the transmit field alone, which is why 0.85 is quoted here as an indication of scale and the provided LUT assumes B1 = 1.
 - The range of T2 values simulated for this LUT table is 10 to 300ms, which is wider than the grey matter (GM) and white matter (WM) tissue target for T2 correction. Within this wider range, long T2 voxels (e.g. cerebrospinal fluid, CSF) are included in the LUT correction at the cost of T1 assumptions (see T1 assumptions below). The bias it removes runs from +0.5ms at T2=10ms to +13.8ms at T2=300ms and +2.8 to +8ms within the 30-130ms band for GM and WM tissue. This range may not match all field strength and tissue and may require adjustments.
 - The "GRAPPATINI" mode assumes that the monoexponential fit applied during reconstruction skipped the first echo of the multi echo train length and was reconstructed from complex data, hence the simulation do not account for a noise floor. Applying the model to other sequence schemes may require further adjustments.
@@ -42,13 +42,16 @@ StimFit must be on the MATLAB path. All functions requiring StimFit call `privat
 | 6 | Prompts for the folder | The answer is written to `stimfit_path.txt` and reused |
 
 ## Inputs
-A LUT is created for a given protocol and must be updated if the protocol changes. Three input files are required to build the LUT: due to origins and sharing restrictions of proprietary data from scanner manufacturers, these files are not merged. 
+A LUT is created for a given protocol and must be updated if the protocol changes. Three input files are required to build the LUT: 
 
 | # | File | Origin |
 |---|------|--------|
 | 1 | Acquisition parameters JSON | Protocol extracted from the scanner / sequence data | 
-| 2 | Pulse properties JSON | Manufacturer / might be provided with dicom metadata | 
+| 2 | Pulse properties JSON | Manufacturer | 
 | 3 | RF waveform files (`.pta`) | Manufacturer |
+
+Due to sharing restrictions of proprietary data from scanner manufacturers, RF pulse related files are not provided with this toolbox. 
+
 
 ### 1. Acquisition parameters
 
@@ -237,7 +240,7 @@ Each table adds one axis to the default one and keeps the other parameter at its
 
 **Example of a three-parameter LUT (optional T1 and B1 axes)**
 
-The first three panels are slices of the table at true T2 = 30, 80 and 130 ms, showing the relative bias (% above true T2) over T1 and B1 on a shared colour scale; the cross marks the default T1 = 1.33 s, B1 = 1. The last panel gives the interpolation error of the correction, measured halfway between grid points over the 30-130 ms band, one square per measurement, with the LUT grid in grey (`checkpoint_step6_grid_accuracy.m`).
+The first three panels are slices of the table at true T2 = 30, 80 and 130 ms, showing the relative bias (% above true T2) over T1 and B1 on a shared colour scale; the cross marks the default T1 = 1.33 s, B1 = 1. The last panel gives the interpolation error of the correction, measured halfway between grid points over the T2 30-130 ms band, one square per measurement, with the LUT grid in grey.
 <p align="center">
 <img src="docs/figures/T2_LUT_3params.png" alt="Three-parameter LUT" width="100%"/>
 </p>
@@ -278,7 +281,7 @@ If the fields do not match, the table has to be rebuilt for your own protocol wi
 Alternatively, compatibility between LUT and dataset can be assessed directly from DICOM or JSON sidecar: 
 ```matlab
 check_LUT_compatibility(LUT, 'sub-01_T2map.json')                       % a JSON file
-check_LUT_compatibility(LUT, '../test_data/.../DICOM', 'SeriesNumber', 15)  % a DICOM folder
+check_LUT_compatibility(LUT, 'path/to/DICOM', 'SeriesNumber', 15)  % a DICOM folder
 ```
 
 ## Applying the LUT
@@ -305,5 +308,13 @@ This toolbox does not provide code for loading T2 maps or saving the output file
 <img src="docs/figures/apply_T2_LUT.png" alt="LUT on GRAPPATINI" width="100%"/>
 </p>
 
+## Tests
+
+`release_tests.m` checks everything that runs without proprietary data. Run it from the repository root:
+
+```matlab
+release_tests
+```
+
 ## Licence
-Code: MIT (`LICENSE`). Test data (data/phantom) will be released under CC-BY-4.0 after approval.
+MIT (`LICENSE`). 

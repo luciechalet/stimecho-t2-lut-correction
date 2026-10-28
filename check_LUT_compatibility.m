@@ -34,7 +34,7 @@ function report = check_LUT_compatibility(LUT, acq, args)
     core  = {'ProtocolName', 'SoftwareVersions', 'PulseSequenceDetails'};
     % Fields checked whenever both sides carry them. SequenceName is here rather
     % than in core because syngo XA does not export it, so a LUT built from XA
-    % data cannot carry it. The others, recorded since 2026-09-11, are what the RF
+    % data cannot carry it. The others are what the RF
     % waveform, the slice profile and the T1 assumption rest on, so a difference
     % invalidates the table even when the name matches.
     extra = {'SequenceName', 'MagneticFieldStrength', 'SliceThickness', 'RFPulseType', 'RFPulseTypeCode'};
